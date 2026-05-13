@@ -1,20 +1,2 @@
-sample_id,fastq_1,fastq_2,bam,umi_preset,expected_status
-# Examples (delete the lines you do not need; sample_id must be unique):
-#
-# Plain 2x150 FASTQ, no UMI:
-# PT001,/data/PT001_R1.fastq.gz,/data/PT001_R2.fastq.gz,,none,
-#
-# TWIST UMI Adapter System (5bp + 2bp spacer per read):
-# PT002,/data/PT002_R1.fastq.gz,/data/PT002_R2.fastq.gz,,twist,
-#
-# IDT xGen UMI-UDI (9bp duplex UMI per read, MRD-grade):
-# PT003,/data/PT003_R1.fastq.gz,/data/PT003_R2.fastq.gz,,xgen_duplex,
-#
-# Pre-aligned BAM (already deduplicated / post-consensus):
-# PT004,,,/data/PT004.bam,none,
-#
-# Negative control (pipeline asserts 0 clonotypes):
-# NEG_01,,,/data/NEG_01.bam,none,negative
-#
-# Known clonal positive control:
-# JURKAT,/data/JURKAT_R1.fq.gz,/data/JURKAT_R2.fq.gz,,none,clonal
+sample_id,fastq_1,fastq_2
+SAMPLE_NAME_HERE,/path/to/R1.fastq.gz,/path/to/R2.fastq.gz
