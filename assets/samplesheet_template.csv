@@ -1,7 +1,0 @@
-sample_id,fastq_1,fastq_2,bam,umi_preset,expected_status
-PT001,/data/PT001_R1.fastq.gz,/data/PT001_R2.fastq.gz,,,
-PT002_TWIST,/data/PT002_R1.fastq.gz,/data/PT002_R2.fastq.gz,,twist,
-PT003_XGEN,/data/PT003_R1.fastq.gz,/data/PT003_R2.fastq.gz,,xgen_duplex,
-PT004_BAM,,,/data/PT004.bam,,
-JURKAT_CTRL,/data/jurkat_R1.fastq.gz,/data/jurkat_R2.fastq.gz,,,clonal
-NEG_CTRL,,,/data/blank.bam,,negative

@@ -26,58 +26,33 @@ DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 
 ## Sample sheet
 
-A CSV with one row per sample. Download the template:
-[`assets/samplesheet_template.csv`](assets/samplesheet_template.csv) — it
-covers every scenario (FASTQ, BAM, UMIs, controls). Delete the rows you don't
-need and edit the rest.
+A CSV with one row per sample. Pick the template matching your data, copy
+it, edit paths.
 
-Or **copy the minimal example below that matches your case** — omit columns
-you don't need.
-
-#### Plain paired FASTQ (most common)
+| Your data | Template |
+|---|---|
+| Paired FASTQ, plain (no UMI) | [`assets/samplesheet_fastq.csv`](assets/samplesheet_fastq.csv) |
+| Paired FASTQ + UMIs (TWIST / xGen) | [`assets/samplesheet_umi.csv`](assets/samplesheet_umi.csv) |
+| Pre-aligned BAMs | [`assets/samplesheet_bam.csv`](assets/samplesheet_bam.csv) |
+| Validation run with controls | [`assets/samplesheet_controls.csv`](assets/samplesheet_controls.csv) |
 
 ```csv
 sample_id,fastq_1,fastq_2
-PT001,/data/PT001_R1.fq.gz,/data/PT001_R2.fq.gz
-PT002,/data/PT002_R1.fq.gz,/data/PT002_R2.fq.gz
-```
-
-#### Pre-aligned BAM
-
-```csv
-sample_id,bam
-PT003,/data/PT003.bam
-```
-
-#### TWIST or IDT xGen UMI library
-
-```csv
-sample_id,fastq_1,fastq_2,umi_preset
-PT004,/data/PT004_R1.fq.gz,/data/PT004_R2.fq.gz,twist
-PT005,/data/PT005_R1.fq.gz,/data/PT005_R2.fq.gz,xgen_duplex
-```
-
-#### Run with validation controls
-
-```csv
-sample_id,fastq_1,fastq_2,bam,expected_status
-PT006,/data/PT006_R1.fq.gz,/data/PT006_R2.fq.gz,,
-JURKAT,/data/jurkat_R1.fq.gz,/data/jurkat_R2.fq.gz,,clonal
-NEG,,,/data/blank.bam,negative
+PT001,/data/PT001_R1.fastq.gz,/data/PT001_R2.fastq.gz
+PT002,/data/PT002_R1.fastq.gz,/data/PT002_R2.fastq.gz
 ```
 
 #### Columns
 
-| Column | When you need it | Values |
+| Column | When | Values |
 |---|---|---|
 | `sample_id` | always | short label, no spaces |
-| `fastq_1`,`fastq_2` | if you have FASTQs | paths (`.gz` OK) |
-| `bam` | if you have aligned BAMs | path (sorted + indexed) |
-| `umi_preset` | only if UMI chemistry | `twist`, `xgen_duplex`, `xgen_simplex`, `custom` |
-| `expected_status` | only for controls | `clonal`, `polyclonal`, `negative` |
+| `fastq_1`,`fastq_2` | FASTQ input | paths (`.gz` OK) |
+| `bam` | BAM input | path (sorted + indexed) |
+| `umi_preset` | UMI library | `twist`, `xgen_duplex`, `xgen_simplex`, `custom` |
+| `expected_status` | controls only | `clonal`, `polyclonal`, `negative` |
 
-A row must have **either FASTQ or BAM, not both**. UMI presets require FASTQ
-(BAMs are already aligned; UMI bases need to come from inline reads).
+Each row uses **FASTQ or BAM, not both**. UMI presets require FASTQ.
 
 ## What it does
 
