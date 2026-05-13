@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="Lymphix" width="420"/></p>
+
 # Lymphix
 
 BCR / TCR clonality and V(D)J rearrangement calling from 2×150 bp Illumina
