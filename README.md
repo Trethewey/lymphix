@@ -3,36 +3,26 @@
 # Lymphix
 
 BCR / TCR clonality and V(D)J rearrangement calling from 2×150 bp Illumina
-DNA capture NGS.
-
-Supports plain Illumina libraries, **TWIST UMI** chemistry, and **IDT xGen
-UMI-UDI** duplex UMI chemistry. Runs locally (Docker), on HPC (Singularity),
-and on **DNAnexus** via the native Nextflow integration.
+DNA capture NGS. Plain, TWIST UMI, and IDT xGen UMI-UDI libraries.
+Local Docker, HPC Singularity, or DNAnexus.
 
 ---
 
 ## Quickstart
 
 ```bash
-# 1. Smoke test — no Docker / Nextflow needed
-./run.sh test
-
-# 2. Real data — paired FASTQ
-./run.sh --samplesheet samples.csv --outdir results/
-
-# 3. DNAnexus
-./run.sh dnanexus --samplesheet dx://project:/samples.csv --outdir dx://project:/results/
+./run.sh test                                              # smoke test, no Docker
+./run.sh --samplesheet samples.csv --outdir results/       # local run
+./run.sh dnanexus --samplesheet dx://project:/samples.csv  # DNAnexus
 ```
 
 ## Install
 
-| Requirement | For what | Install |
-|---|---|---|
-| **Nextflow ≥ 23.10** | Pipeline orchestration | `curl -fsSL https://get.nextflow.io \| bash` |
-| **Docker Desktop** *or* **Singularity** | Containers | https://docker.com / Singularity per HPC docs |
-| Python 3.10+ + pandas + plotly + jinja2 | Smoke test / analysis only | `pip install pandas numpy plotly jinja2 scipy pytest` |
+- Nextflow ≥ 23.10 — `curl -fsSL https://get.nextflow.io | bash`
+- Docker Desktop *or* Singularity
+- Python 3.10+ with pandas, numpy, plotly, jinja2, scipy, pytest (smoke test only)
 
-For DNAnexus deployment see [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
+DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 
 ## Sample sheet
 
@@ -54,11 +44,8 @@ NEG,,,/data/blank.bam,none,negative
 | `umi_preset`        | no | `none` (default), `twist`, `xgen_duplex`, `xgen_simplex`, `custom` |
 | `expected_status`   | no | `clonal` / `polyclonal` / `negative` — drives QC assertions |
 
-**Constraint:** `bam + umi_preset != none` is rejected — UMI processing
-requires inline UMI bases in the FASTQs.
-
-See [`assets/samplesheet_template.csv`](assets/samplesheet_template.csv) for
-annotated examples.
+`bam + umi_preset != none` is rejected — UMI processing needs inline UMI bases.
+Annotated examples in [`assets/samplesheet_template.csv`](assets/samplesheet_template.csv).
 
 ## What it does
 
@@ -119,52 +106,16 @@ results/
 
 ## Example results
 
-Two cropped views from the report Lymphix produces on a synthetic clonal sample.
-
-**Header — banner, clinical verdict, aggregate metrics:**
-
 <p align="center">
-  <img src="examples/report_top_text.png" alt="Report header — verdict and KPIs" width="100%"/>
+  <img src="examples/report_top_text.png" alt="Report header" width="100%"/>
 </p>
 
-**Section 1 — Lineage composition (thermometer + donut + Sankey):**
-
 <p align="center">
-  <img src="examples/report_composition.png" alt="Report Section 1 — lineage composition" width="100%"/>
+  <img src="examples/report_composition.png" alt="Lineage composition" width="100%"/>
 </p>
 
-**Both example reports** (download the raw `.html` and open locally for the
-fully-interactive Plotly version):
-
-- **Clonal sample** — dominant IGH + TRB clones · verdict *"Bi-clonal — B-cell (IGH) and T-cell (TRB)"*
-  · [raw .html](examples/clonal_sample_report.html)
-  · [metrics.json](examples/clonal_sample.metrics.json)
-- **Polyclonal sample** — diverse repertoire · verdict *"Polyclonal repertoire — no dominant clone detected"*
-  · [raw .html](examples/polyclonal_sample_report.html)
-  · [metrics.json](examples/polyclonal_sample.metrics.json)
-
-Headline numbers from the two examples:
-
-| Metric | Clonal sample | Polyclonal sample |
-|---|---:|---:|
-| Aggregate clonotypes | 50 | 2,297 |
-| Aggregate reads | 21,652 | 47,776 |
-| Top clone fraction | 49.8% | 0.2% |
-| **Clonality index** | **0.501** | **0.006** |
-| IGH clonality | 0.884 (D50 = 1) | 0.001 (D50 = 138) |
-| TRB clonality | 0.728 (D50 = 1) | 0.002 (D50 = 147) |
-| κ:λ ratio | 0.72 (balanced) | 1.28 (balanced) |
-| **Verdict banner** | "Bi-clonal — B-cell (IGH) and T-cell (TRB)" | "Polyclonal repertoire — no dominant clone detected" |
-
-The raw [`examples/*.metrics.json`](examples/) files are also committed so the
-full numeric output is available without running the pipeline.
-
-To regenerate these locally:
-
-```bash
-make test-smoke
-# results land in results_smoke_test/<sample>/<sample>.report.html
-```
+Full HTML reports and `metrics.json` in [`examples/`](examples/).
+Regenerate with `make test-smoke`.
 
 ## Build the containers
 
@@ -177,25 +128,19 @@ make push REGISTRY=ghcr.io/myorg/lymphix         # override registry if needed
 ## Tests
 
 ```bash
-make test           # unit tests + end-to-end smoke
+make test           # unit + smoke
 make test-unit      # pytest math tests
 make test-smoke     # mock-AIRR → clonality_metrics → report
 ```
 
-Smoke test runs in <10 s, requires only Python + pandas + plotly + jinja2.
-
 ## Panel BED
 
 `regions/clonality_BCR_TCR.bed` (hg38, `chr` prefix) and
-`regions/clonality_BCR_TCR.no_chr.bed` (same coords, naked contigs for
-Ensembl/GIAB-style references). Used for on-target QC; not required by
-TRUST4 itself.
+`regions/clonality_BCR_TCR.no_chr.bed` (Ensembl/GIAB-style). On-target QC only.
 
 ## Citations
 
-Lymphix is a thin orchestration layer around two established immune-repertoire
-tools. **If you publish results derived from this pipeline, please cite both
-primary tools as well as Lymphix.**
+Please cite TRUST4 and IgBLAST when publishing results.
 
 ### Primary tools
 
@@ -224,13 +169,9 @@ primary tools as well as Lymphix.**
 | **Nextflow** | Workflow orchestration | Di Tommaso et al. *Nature Biotechnology* 35, 316–319 (2017). [doi:10.1038/nbt.3820](https://doi.org/10.1038/nbt.3820) |
 | **Plotly**   | Interactive HTML figures | [plotly.com/python](https://plotly.com/python/) |
 
-A machine-readable [`CITATION.cff`](CITATION.cff) is also provided so GitHub
-renders a "Cite this repository" button on the repo page.
+See [`CITATION.cff`](CITATION.cff) for the machine-readable form.
 
 ## Licence
 
-MIT — see [`LICENSE`](LICENSE).
-
-Third-party licences (all permissive / open):
-TRUST4 (MIT) · IgBLAST (NCBI public domain) · fastp (MIT) · fgbio (MIT) ·
-BWA (GPL-3) · samtools (MIT) · Nextflow (Apache-2.0) · Plotly (MIT).
+MIT. Third-party: TRUST4 (MIT) · IgBLAST (public domain) · fastp (MIT) ·
+fgbio (MIT) · BWA (GPL-3) · samtools (MIT) · Nextflow (Apache-2.0) · Plotly (MIT).
