@@ -119,14 +119,18 @@ results/
 
 ## Example results
 
-Top section of a Lymphix report on a synthetic clonal sample. Banner, verdict,
-KPIs, lineage composition (thermometer + donut + Sankey), and the start of the
-top-clones section. Click for full size.
+Two cropped views from the report Lymphix produces on a synthetic clonal sample.
+
+**Header — banner, clinical verdict, aggregate metrics:**
 
 <p align="center">
-  <a href="examples/clonal_sample_report.png">
-    <img src="examples/clonal_sample_report.png" alt="Lymphix report — clonal example" width="100%"/>
-  </a>
+  <img src="examples/report_top_text.png" alt="Report header — verdict and KPIs" width="100%"/>
+</p>
+
+**Section 1 — Lineage composition (thermometer + donut + Sankey):**
+
+<p align="center">
+  <img src="examples/report_composition.png" alt="Report Section 1 — lineage composition" width="100%"/>
 </p>
 
 **Both example reports** (download the raw `.html` and open locally for the
