@@ -129,14 +129,13 @@ top-clones section. Click for full size.
   </a>
 </p>
 
-**Both example reports** (HTML, fully interactive Plotly):
+**Both example reports** (download the raw `.html` and open locally for the
+fully-interactive Plotly version):
 
 - **Clonal sample** — dominant IGH + TRB clones · verdict *"Bi-clonal — B-cell (IGH) and T-cell (TRB)"*
-  · [▶ open the live HTML report](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/clonal_sample_report.html)
   · [raw .html](examples/clonal_sample_report.html)
   · [metrics.json](examples/clonal_sample.metrics.json)
 - **Polyclonal sample** — diverse repertoire · verdict *"Polyclonal repertoire — no dominant clone detected"*
-  · [▶ open the live HTML report](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/polyclonal_sample_report.html)
   · [raw .html](examples/polyclonal_sample_report.html)
   · [metrics.json](examples/polyclonal_sample.metrics.json)
 
