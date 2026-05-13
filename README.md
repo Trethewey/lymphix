@@ -26,8 +26,13 @@ DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 
 ## Sample sheet
 
-A CSV with one row per sample. **Copy the example below that matches your
-case** — omit columns you don't need.
+A CSV with one row per sample. Download the template:
+[`assets/samplesheet_template.csv`](assets/samplesheet_template.csv) — it
+covers every scenario (FASTQ, BAM, UMIs, controls). Delete the rows you don't
+need and edit the rest.
+
+Or **copy the minimal example below that matches your case** — omit columns
+you don't need.
 
 #### Plain paired FASTQ (most common)
 
