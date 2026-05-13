@@ -1,4 +1,4 @@
 sample_id,fastq_1,fastq_2,expected_status
-JURKAT,/data/jurkat_R1.fastq.gz,/data/jurkat_R2.fastq.gz,clonal
-DONOR_PBMC,/data/donor_R1.fastq.gz,/data/donor_R2.fastq.gz,polyclonal
-WATER_BLANK,/data/blank_R1.fastq.gz,/data/blank_R2.fastq.gz,negative
+JURKAT,jurkat_R1.fastq.gz,jurkat_R2.fastq.gz,clonal
+DONOR_PBMC,donor_R1.fastq.gz,donor_R2.fastq.gz,polyclonal
+WATER_BLANK,blank_R1.fastq.gz,blank_R2.fastq.gz,negative

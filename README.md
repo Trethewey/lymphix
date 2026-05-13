@@ -27,19 +27,19 @@ DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 ## Sample sheet
 
 A CSV with one row per sample. Pick the template matching your data, copy
-it, edit paths.
+it, replace the file names with your own.
 
 | Your data | Template |
 |---|---|
-| Paired FASTQ, plain (no UMI) | [`assets/samplesheet_fastq.csv`](assets/samplesheet_fastq.csv) |
-| Paired FASTQ + UMIs (TWIST / xGen) | [`assets/samplesheet_umi.csv`](assets/samplesheet_umi.csv) |
-| Pre-aligned BAMs | [`assets/samplesheet_bam.csv`](assets/samplesheet_bam.csv) |
-| Validation run with controls | [`assets/samplesheet_controls.csv`](assets/samplesheet_controls.csv) |
+| Paired FASTQ, plain (no UMI) | [FASTQ template](assets/samplesheet_fastq.csv) |
+| Paired FASTQ + UMIs (TWIST / xGen) | [UMI template](assets/samplesheet_umi.csv) |
+| Pre-aligned BAMs | [BAM template](assets/samplesheet_bam.csv) |
+| Validation run with controls | [Controls template](assets/samplesheet_controls.csv) |
 
 ```csv
 sample_id,fastq_1,fastq_2
-PT001,/data/PT001_R1.fastq.gz,/data/PT001_R2.fastq.gz
-PT002,/data/PT002_R1.fastq.gz,/data/PT002_R2.fastq.gz
+PT001,PT001_R1.fastq.gz,PT001_R2.fastq.gz
+PT002,PT002_R1.fastq.gz,PT002_R2.fastq.gz
 ```
 
 #### Columns
