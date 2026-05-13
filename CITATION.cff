@@ -1,0 +1,72 @@
+cff-version: 1.2.0
+title: Lymphix
+message: >-
+  If you use Lymphix in published work, please cite the underlying tools
+  (TRUST4 and IgBLAST) as well as this software.
+type: software
+authors:
+  - family-names: Trethewey
+    given-names: "C. S."
+repository-code: "https://github.com/Trethewey/lymphix"
+url: "https://github.com/Trethewey/lymphix"
+abstract: >-
+  Lymphix is a Nextflow pipeline for BCR / TCR clonality and V(D)J
+  rearrangement calling from 2x150bp Illumina DNA capture NGS. Supports plain
+  Illumina libraries, TWIST UMI chemistry, and IDT xGen UMI-UDI duplex UMIs.
+  Wraps TRUST4 (V(D)J assembly) and IgBLAST (re-annotation with V-identity %
+  for IGHV CLL classification), and computes per-locus clonality metrics,
+  lineage composition, kappa/lambda restriction, and an HTML report.
+keywords:
+  - immune repertoire
+  - BCR
+  - TCR
+  - V(D)J
+  - clonality
+  - lymphoma
+  - CLL
+  - Nextflow
+  - DNAnexus
+license: MIT
+version: "0.1.0"
+date-released: "2026-05-13"
+references:
+  - type: article
+    title: "TRUST4: immune repertoire reconstruction from bulk and single-cell RNA-seq data"
+    year: 2021
+    journal: Nature Methods
+    volume: 18
+    issue: 6
+    start: 627
+    end: 630
+    doi: 10.1038/s41592-021-01142-2
+    authors:
+      - family-names: Song
+        given-names: Li
+      - family-names: Cohen
+        given-names: David
+      - family-names: Ouyang
+        given-names: Zhangyi
+      - family-names: Cao
+        given-names: Yi
+      - family-names: Hu
+        given-names: Xihao
+      - family-names: Liu
+        given-names: "X. Shirley"
+  - type: article
+    title: "IgBLAST: an immunoglobulin variable domain sequence analysis tool"
+    year: 2013
+    journal: Nucleic Acids Research
+    volume: 41
+    issue: W1
+    start: W34
+    end: W40
+    doi: 10.1093/nar/gkt382
+    authors:
+      - family-names: Ye
+        given-names: Jian
+      - family-names: Ma
+        given-names: Ning
+      - family-names: Madden
+        given-names: "Thomas L."
+      - family-names: Ostell
+        given-names: "Jim M."

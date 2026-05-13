@@ -1,0 +1,93 @@
+{
+  "name": "lymphix",
+  "title": "BCR/TCR Clonality Pipeline (TRUST4 + IgBLAST)",
+  "summary": "Detect IG/TCR clonality and V(D)J rearrangements from custom-panel 2x150bp DNA capture NGS.",
+  "version": "0.1.0",
+  "dxapi": "1.0.0",
+  "openSource": true,
+  "categories": ["Sequence Analysis", "Variation Calling"],
+  "inputSpec": [
+    {
+      "name": "samplesheet",
+      "label": "Sample sheet (CSV: sample_id,fastq_1,fastq_2)",
+      "class": "file",
+      "patterns": ["*.csv"],
+      "optional": false
+    },
+    {
+      "name": "species",
+      "label": "Species",
+      "class": "string",
+      "default": "human",
+      "choices": ["human", "mouse"],
+      "optional": true
+    },
+    {
+      "name": "receptor",
+      "label": "Receptor scope",
+      "class": "string",
+      "default": "all",
+      "choices": ["all", "bcr", "tcr"],
+      "optional": true
+    },
+    {
+      "name": "igh_mutated_cutoff",
+      "label": "IGHV %V-identity cutoff for unmutated classification",
+      "class": "float",
+      "default": 98.0,
+      "optional": true
+    },
+    {
+      "name": "min_clone_count",
+      "label": "Minimum reads per clonotype",
+      "class": "int",
+      "default": 2,
+      "optional": true
+    },
+    {
+      "name": "nextflow_pipeline_params",
+      "label": "Additional Nextflow params",
+      "class": "string",
+      "default": "",
+      "optional": true
+    }
+  ],
+  "outputSpec": [
+    {
+      "name": "results",
+      "label": "Pipeline outputs (per-sample directories)",
+      "class": "array:file"
+    },
+    {
+      "name": "reports",
+      "label": "Per-sample HTML reports",
+      "class": "array:file",
+      "patterns": ["*.report.html"]
+    }
+  ],
+  "runSpec": {
+    "interpreter": "bash",
+    "file": "src/code.sh",
+    "distribution": "Ubuntu",
+    "release": "20.04",
+    "version": "0",
+    "timeoutPolicy": {
+      "*": { "hours": 24 }
+    },
+    "execDepends": [
+      { "name": "openjdk-17-jre-headless" },
+      { "name": "docker.io" }
+    ]
+  },
+  "access": {
+    "network": ["*"],
+    "project": "CONTRIBUTE"
+  },
+  "regionalOptions": {
+    "aws:us-east-1": {
+      "systemRequirements": {
+        "*": { "instanceType": "mem2_ssd1_v2_x16" }
+      }
+    }
+  }
+}

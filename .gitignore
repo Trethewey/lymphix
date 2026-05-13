@@ -1,0 +1,36 @@
+# Inputs / outputs — never commit
+bams/
+*.bam
+*.bai
+*.cram
+*.crai
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.sra
+
+# Pipeline runtime
+.nextflow*
+work/
+results/
+results_*/
+test_data/
+*.truth.json
+*.log
+
+# Editors / OS
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+.vscode/
+.idea/
+.pytest_cache/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+dxapp.json.lock

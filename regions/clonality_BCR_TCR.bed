@@ -1,0 +1,14 @@
+# v2 panel BCR + TCR clonality regions (hg38)
+# chrom	start	end	name
+chr14	105863000	105870000	IGH__JH_cluster
+chr14	105875000	105895000	IGH__DH_cluster
+chr14	105900000	107280000	IGH__VH-FR1/FR2/FR3_sampled_anchors
+chr2	88857000	88862000	IGK__Jkappa_cluster
+chr2	88832000	88835000	IGK__Kde_and_intronic_RSS
+chr22	22850000	22920000	IGL__Jlambda_and_Clambda
+chr7	142790000	142795000	TRB__Jbeta1_cluster_and_Cbeta1
+chr7	142800000	142806000	TRB__Jbeta2_cluster_and_Cbeta2
+chr7	142786000	142800000	TRB__Dbeta1/Dbeta2_regions
+chr7	38240000	38370000	TRG__Vgamma_cluster
+chr7	38250000	38260000	TRG__Jgamma_and_Cgamma_clusters
+chr14	22420000	22445000	TRD__Vdelta_and_Ddelta_and_Jdelta_and_Cdelta

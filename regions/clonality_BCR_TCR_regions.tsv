@@ -1,0 +1,13 @@
+locus	region	chrom	start_hg38	end_hg38	size_kb	strand	biomed2_tube	tiling	role	notes
+IGH	JH cluster (J1-J6) + Emu enhancer	chr14	105863000	105870000	7.0	-	Tube A/B (FR1/2/3 -> JH)	2X	BCR-required + Tx-shared	Captures all VDJ rearrangements with J anchor; Emu adds CSR coverage
+IGH	DH cluster (D1-7)	chr14	105875000	105895000	20.0	-	Tube C (DH -> JH)	1X	BCR-required	Catches incomplete D-J rearrangements (immature B-cell)
+IGH	VH-FR1/FR2/FR3 sampled anchors (~10 of ~50 functional V genes)	chr14	105900000	107280000	1380.0	-	Tube A/B/C (FR1/2/3 -> JH)	1X	BCR-OPTIONAL (needed for IGHV SHM/CLL status)	Full V repertoire ~1.4 Mb impractical; sampled anchors give partial V identification
+IGK	Jkappa cluster (J1-J5) + Ckappa	chr2	88857000	88862000	5.0	-	IGK Tube A	2X	BCR-required + Tx-shared	All Vk-Jk rearrangements via J anchor
+IGK	Kde + intronic RSS	chr2	88832000	88835000	3.0	-	IGK Tube B	2X	BCR-required	Kde rearrangements (allelic exclusion / lambda-using clones)
+IGL	Jlambda + Clambda (J1-C1, J2-C2, J3-C3, J7-C7)	chr22	22850000	22920000	70.0	+	IGL Tube A	2X	BCR-required + Tx-shared	Multiple J-C pairs; tile across full J-C region
+TRB	Jbeta1 cluster + Cbeta1	chr7	142790000	142795000	5.0	+	TRB Tube A	2X	TCR-required	First Jbeta cluster + Cb1
+TRB	Jbeta2 cluster + Cbeta2	chr7	142800000	142806000	6.0	+	TRB Tube A	2X	TCR-required	Second Jbeta cluster + Cb2
+TRB	Dbeta1/Dbeta2 regions	chr7	142786000	142800000	14.0	+	TRB Tube B	2X	TCR-required	D-J rearrangement detection
+TRG	Vgamma cluster (Vg1-Vg11 + Vg9 + VgI/II)	chr7	38240000	38370000	130.0	+	TRG Tube A/B	1X	TCR-required (full V tile feasible)	Compact V repertoire allows full tiling for V-J resolution
+TRG	Jgamma + Cgamma clusters	chr7	38250000	38260000	10.0	+	TRG Tube A/B	2X	TCR-required	J-C anchors
+TRD	Vdelta + Ddelta + Jdelta + Cdelta	chr14	22420000	22445000	25.0	+	TRD Tube A	2X	TCR-required	TRD nested within TRA locus
