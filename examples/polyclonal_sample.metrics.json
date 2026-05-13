@@ -1,0 +1,133 @@
+{
+  "sample_id": "POLYCLONAL_TEST",
+  "min_clone_count": 2,
+  "per_locus": {
+    "IGH": {
+      "n_clonotypes": 95,
+      "n_reads": 4286,
+      "top_clone_fraction": 0.018432104526364908,
+      "shannon_H": 4.4422489602859585,
+      "shannon_H_normalised": 0.9754872751346274,
+      "clonality_index": 0.024512724865372593,
+      "simpson_D": 0.012684626437876611,
+      "gini": 0.260952427732888,
+      "D50": 32
+    },
+    "IGK": {
+      "n_clonotypes": 75,
+      "n_reads": 3073,
+      "top_clone_fraction": 0.02570777741620566,
+      "shannon_H": 4.180290469204978,
+      "shannon_H_normalised": 0.9682228090214804,
+      "clonality_index": 0.03177719097851961,
+      "simpson_D": 0.01680689087502935,
+      "gini": 0.2929515131793036,
+      "D50": 24
+    },
+    "IGL": {
+      "n_clonotypes": 83,
+      "n_reads": 3620,
+      "top_clone_fraction": 0.02154696132596685,
+      "shannon_H": 4.309350280325761,
+      "shannon_H_normalised": 0.9752219332651074,
+      "clonality_index": 0.02477806673489258,
+      "simpson_D": 0.014523671438600776,
+      "gini": 0.2609398921653464,
+      "D50": 28
+    },
+    "TRA": {
+      "n_clonotypes": 79,
+      "n_reads": 3357,
+      "top_clone_fraction": 0.023532916294310396,
+      "shannon_H": 4.26904725301803,
+      "shannon_H_normalised": 0.9770221312076526,
+      "clonality_index": 0.022977868792347422,
+      "simpson_D": 0.015088492791439936,
+      "gini": 0.2517015267549764,
+      "D50": 26
+    },
+    "TRB": {
+      "n_clonotypes": 101,
+      "n_reads": 4732,
+      "top_clone_fraction": 0.0169061707523246,
+      "shannon_H": 4.512430038519255,
+      "shannon_H_normalised": 0.9777491231383293,
+      "clonality_index": 0.02225087686167071,
+      "simpson_D": 0.011787784684266903,
+      "gini": 0.25151276750667456,
+      "D50": 34
+    },
+    "TRG": {
+      "n_clonotypes": 83,
+      "n_reads": 3602,
+      "top_clone_fraction": 0.02220988339811216,
+      "shannon_H": 4.274559531432433,
+      "shannon_H_normalised": 0.9673486579014423,
+      "clonality_index": 0.03265134209855769,
+      "simpson_D": 0.015326176061728923,
+      "gini": 0.29968625194838205,
+      "D50": 26
+    },
+    "TRD": {
+      "n_clonotypes": 84,
+      "n_reads": 3786,
+      "top_clone_fraction": 0.02086634970945589,
+      "shannon_H": 4.294107601085191,
+      "shannon_H_normalised": 0.9691458248073332,
+      "clonality_index": 0.030854175192666755,
+      "simpson_D": 0.014877008156108821,
+      "gini": 0.2870600960933766,
+      "D50": 27
+    }
+  },
+  "aggregate": {
+    "n_clonotypes": 600,
+    "n_reads": 26456,
+    "top_clone_fraction": 0.0030238887208950713,
+    "shannon_H": 6.276779462888647,
+    "shannon_H_normalised": 0.9812175217169181,
+    "clonality_index": 0.018782478283081883,
+    "simpson_D": 0.002040421949061328,
+    "gini": 0.2731225430904143,
+    "D50": 193
+  },
+  "ighv_status": {
+    "cutoff_percent_v_identity": 98.0,
+    "reads_total": 4286,
+    "reads_unmutated": 785,
+    "reads_mutated": 3501,
+    "reads_unknown": 0,
+    "fraction_unmutated": 0.18315445636957536,
+    "dominant_status": "mutated"
+  },
+  "composition": {
+    "total_input_reads_known": true,
+    "total_input_reads": 25000,
+    "vdj_assigned_reads": 26456,
+    "clonal_dominance_threshold": 0.05,
+    "reads": {
+      "clonal_IGH": 0,
+      "clonal_IGK_kappa": 0,
+      "clonal_IGL_lambda": 0,
+      "polyclonal_B": 10979,
+      "clonal_TRB": 0,
+      "clonal_TRG_gamma_delta": 0,
+      "polyclonal_T": 15477,
+      "background": 0
+    },
+    "fractions": {
+      "clonal_IGH": 0.0,
+      "clonal_IGK_kappa": 0.0,
+      "clonal_IGL_lambda": 0.0,
+      "polyclonal_B": 0.43916,
+      "clonal_TRB": 0.0,
+      "clonal_TRG_gamma_delta": 0.0,
+      "polyclonal_T": 0.61908,
+      "background": 0.0
+    },
+    "kappa_reads": 3073,
+    "lambda_reads": 3620,
+    "kappa_lambda_ratio": 0.8488950276243094,
+    "kappa_lambda_call": "balanced"
+  }
+}

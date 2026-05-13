@@ -351,11 +351,24 @@ TEMPLATE = """
 :root { --bcr:#1B4F72; --tcr:#922B21; --pos:#c0392b; --neg:#27ae60; --warn:#e67e22; --muted:#666; }
 body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1200px;
        margin: 0 auto; color: #222; background: #fafafa; }
-header { padding: 20px 28px 8px; border-bottom: 1px solid #ddd; }
-header .brand { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
-                color: var(--muted); }
-header h1 { margin: 4px 0 2px; font-size: 24px; }
-header .meta { color: var(--muted); font-size: 12px; }
+
+/* --- Top banner ----------------------------------------------------------- */
+header { background: linear-gradient(135deg, #1B4F72 0%, #2C3E50 60%, #5D2018 100%);
+         padding: 20px 32px 22px;
+         display: grid; grid-template-columns: auto 1fr; column-gap: 28px;
+         align-items: center;
+         border-bottom: 4px solid #E67E22; color: #ECF0F1; }
+header .logo { width: 260px; height: auto; }
+header .titles { min-width: 0; }
+header .brand { font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+                color: #BDC3C7; }
+header h1 { margin: 4px 0 6px; font-size: 24px; color: #FFFFFF;
+            font-weight: 600; }
+header .meta { color: #BDC3C7; font-size: 12px; line-height: 1.6; }
+/* Invert the SVG wordmark colours when sitting on the dark banner */
+header .logo text[fill="#2C3E50"] { fill: #FFFFFF; }
+header .logo text[fill="#7F8C8D"] { fill: #BDC3C7; }
+header .logo line[stroke="#2C3E50"] { stroke: #FFFFFF; }
 .verdict { margin: 16px 28px; padding: 14px 18px; border-radius: 6px;
            border-left: 5px solid var(--neg); background: #f4faf6; }
 .verdict.positive  { border-color: var(--pos); background: #fdf3f1; }
@@ -386,18 +399,34 @@ table.clones code { font-size: 10px; }
 .kpi .l { font-size: 10px; color: var(--muted); text-transform: uppercase;
           letter-spacing: 0.5px; }
 .kpi .v { font-size: 18px; font-weight: 600; }
-footer { color: var(--muted); font-size: 10px; padding: 16px 28px 30px; }
+/* --- Bottom banner -------------------------------------------------------- */
+footer {
+    background: linear-gradient(135deg, #1B4F72 0%, #2C3E50 60%, #5D2018 100%);
+    color: #ECF0F1;
+    padding: 16px 32px 18px;
+    border-top: 4px solid #E67E22;
+    margin-top: 24px;
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.6;
+}
+footer .footer-meta { color: #BDC3C7; font-size: 11px;
+                       letter-spacing: 0.3px; }
+footer .footer-meta .name { color: #ECF0F1; }
 </style>
 </head><body>
 
 <header>
-  <div class="brand">Lymphix &nbsp;|&nbsp; BCR / TCR Clonality Report</div>
-  <h1>{{ sample_id }}</h1>
-  <div class="meta">
-    Generated {{ generated_on }} &nbsp;|&nbsp;
-    Total input reads: {{ '{:,}'.format(comp.total_input_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
-    V(D)J assembled: {{ '{:,}'.format(comp.vdj_assigned_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
-    Min clone count: {{ min_clone_count }}
+  {{ logo_svg|safe }}
+  <div class="titles">
+    <div class="brand">BCR / TCR Clonality Report</div>
+    <h1>{{ sample_id }}</h1>
+    <div class="meta">
+      Generated {{ generated_on }} &nbsp;|&nbsp;
+      Total input reads: {{ '{:,}'.format(comp.total_input_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
+      V(D)J assembled: {{ '{:,}'.format(comp.vdj_assigned_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
+      Min clone count: {{ min_clone_count }}
+    </div>
   </div>
 </header>
 
@@ -520,10 +549,15 @@ footer { color: var(--muted); font-size: 10px; padding: 16px 28px 30px; }
 {% endif %}
 
 <footer>
-  Pipeline: Lymphix v0.1.0 (TRUST4 + IgBLAST) ·
-  Clonal threshold for verdict: per-locus clonality index ≥ {{ '%.2f'|format(locus_threshold) }},
-  top-clone fraction ≥ {{ '%.0f'|format(top_clone_threshold * 100) }}% ·
-  Composition clonal threshold: per-clone ≥ {{ '%.0f'|format(composition_threshold * 100) }}% of locus.
+  <div class="footer-meta">
+    Lymphix v0.1.0 · TRUST4 + IgBLAST · Generated {{ generated_on }} ·
+    <span class="name">Dr C.S. Trethewey</span>
+  </div>
+  <div class="footer-meta">
+    Clonal threshold: per-locus clonality index ≥ {{ '%.2f'|format(locus_threshold) }},
+    top-clone fraction ≥ {{ '%.0f'|format(top_clone_threshold * 100) }}% ·
+    Composition threshold: per-clone ≥ {{ '%.0f'|format(composition_threshold * 100) }}% of locus
+  </div>
 </footer>
 
 </body></html>
@@ -533,6 +567,21 @@ footer { color: var(--muted); font-size: 10px; padding: 16px 28px 30px; }
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+def _load_logo_svg() -> str:
+    """Return inline SVG markup with class='logo' so it can be embedded directly.
+    Falls back to a small text logo if assets/logo.svg is missing."""
+    candidates = [
+        Path(__file__).resolve().parents[1] / "assets" / "logo.svg",
+        Path(__file__).resolve().parent / "assets" / "logo.svg",
+    ]
+    for path in candidates:
+        if path.exists():
+            svg = path.read_text(encoding="utf-8")
+            # Inject class="logo" onto the <svg> root
+            return svg.replace("<svg ", '<svg class="logo" ', 1)
+    return '<div class="logo" style="font-weight:700; font-size:22px">Lymphix</div>'
+
+
 def main(argv=None):
     import datetime
     ap = argparse.ArgumentParser()
@@ -587,6 +636,7 @@ def main(argv=None):
 
     html = Template(TEMPLATE).render(
         sample_id       = args.sample_id,
+        logo_svg        = _load_logo_svg(),
         generated_on    = datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         min_clone_count = metrics.get("min_clone_count", 2),
         comp            = comp,

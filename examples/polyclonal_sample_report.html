@@ -1,0 +1,397 @@
+
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>BCR/TCR Clonality — POLYCLONAL_TEST</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+:root { --bcr:#1B4F72; --tcr:#922B21; --pos:#c0392b; --neg:#27ae60; --warn:#e67e22; --muted:#666; }
+body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1200px;
+       margin: 0 auto; color: #222; background: #fafafa; }
+
+/* --- Top banner ----------------------------------------------------------- */
+header { background: linear-gradient(135deg, #1B4F72 0%, #2C3E50 60%, #5D2018 100%);
+         padding: 20px 32px 22px;
+         display: grid; grid-template-columns: auto 1fr; column-gap: 28px;
+         align-items: center;
+         border-bottom: 4px solid #E67E22; color: #ECF0F1; }
+header .logo { width: 260px; height: auto; }
+header .titles { min-width: 0; }
+header .brand { font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+                color: #BDC3C7; }
+header h1 { margin: 4px 0 6px; font-size: 24px; color: #FFFFFF;
+            font-weight: 600; }
+header .meta { color: #BDC3C7; font-size: 12px; line-height: 1.6; }
+/* Invert the SVG wordmark colours when sitting on the dark banner */
+header .logo text[fill="#2C3E50"] { fill: #FFFFFF; }
+header .logo text[fill="#7F8C8D"] { fill: #BDC3C7; }
+header .logo line[stroke="#2C3E50"] { stroke: #FFFFFF; }
+.verdict { margin: 16px 28px; padding: 14px 18px; border-radius: 6px;
+           border-left: 5px solid var(--neg); background: #f4faf6; }
+.verdict.positive  { border-color: var(--pos); background: #fdf3f1; }
+.verdict.uncertain { border-color: var(--warn); background: #fdf6ec; }
+.verdict h2 { margin: 0; font-size: 18px; }
+.verdict ul { margin: 8px 0 0 18px; padding: 0; font-size: 13px; color: #333; }
+.verdict .warn { color: var(--warn); font-size: 12px; margin-top: 6px; }
+section { padding: 16px 28px 24px; border-top: 1px solid #ddd; }
+section h2 { font-size: 18px; border-left: 4px solid #4a7; padding-left: 10px; margin: 0 0 8px; }
+section p.intro { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+.row { display: grid; gap: 14px; }
+.row.two   { grid-template-columns: 1fr 1fr; }
+.row.equal { grid-template-columns: 1fr 1fr; }
+.row.three { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: white; border: 1px solid #e0e0e0; border-radius: 6px;
+        padding: 8px 14px; }
+.card h3 { font-size: 14px; margin: 4px 0 6px; }
+.bcr-only { border-top: 3px solid var(--bcr); }
+.tcr-only { border-top: 3px solid var(--tcr); }
+table.clones { width: 100%; border-collapse: collapse; font-size: 11px; }
+table.clones th, table.clones td { padding: 4px 8px; border-bottom: 1px solid #eee;
+                                    text-align: left; }
+table.clones th { background: #f4f4f4; font-weight: 600; }
+table.clones code { font-size: 10px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0; }
+.kpi { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px;
+       padding: 8px 10px; }
+.kpi .l { font-size: 10px; color: var(--muted); text-transform: uppercase;
+          letter-spacing: 0.5px; }
+.kpi .v { font-size: 18px; font-weight: 600; }
+/* --- Bottom banner -------------------------------------------------------- */
+footer {
+    background: linear-gradient(135deg, #1B4F72 0%, #2C3E50 60%, #5D2018 100%);
+    color: #ECF0F1;
+    padding: 16px 32px 18px;
+    border-top: 4px solid #E67E22;
+    margin-top: 24px;
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.6;
+}
+footer .footer-meta { color: #BDC3C7; font-size: 11px;
+                       letter-spacing: 0.3px; }
+footer .footer-meta .name { color: #ECF0F1; }
+</style>
+</head><body>
+
+<header>
+  <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 200" width="420" height="200">
+  <!-- Lymphix logo — concept B: dual-lineage branching repertoire tree.
+       BCR branches (blues, left), TCR branches (reds/oranges, right). -->
+
+  <!-- Trunk -->
+  <line x1="80" y1="170" x2="80" y2="130" stroke="#2C3E50" stroke-width="6" stroke-linecap="round"/>
+  <!-- Primary fork -->
+  <line x1="80" y1="130" x2="50" y2="100" stroke="#1B4F72" stroke-width="5" stroke-linecap="round"/>
+  <line x1="80" y1="130" x2="110" y2="100" stroke="#922B21" stroke-width="5" stroke-linecap="round"/>
+  <!-- BCR secondary branches (blue family) -->
+  <line x1="50" y1="100" x2="30" y2="70" stroke="#1B4F72" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="100" x2="55" y2="60" stroke="#2E86C1" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="100" x2="20" y2="90" stroke="#85C1E9" stroke-width="4" stroke-linecap="round"/>
+  <!-- TCR secondary branches (red/orange family) -->
+  <line x1="110" y1="100" x2="105" y2="60" stroke="#922B21" stroke-width="4" stroke-linecap="round"/>
+  <line x1="110" y1="100" x2="130" y2="70" stroke="#C0392B" stroke-width="4" stroke-linecap="round"/>
+  <line x1="110" y1="100" x2="140" y2="90" stroke="#E67E22" stroke-width="4" stroke-linecap="round"/>
+  <!-- Clonotype tips -->
+  <circle cx="30"  cy="70" r="5" fill="#1B4F72"/>
+  <circle cx="55"  cy="60" r="5" fill="#2E86C1"/>
+  <circle cx="20"  cy="90" r="5" fill="#85C1E9"/>
+  <circle cx="105" cy="60" r="5" fill="#922B21"/>
+  <circle cx="130" cy="70" r="5" fill="#C0392B"/>
+  <circle cx="140" cy="90" r="5" fill="#E67E22"/>
+
+  <!-- Wordmark -->
+  <text x="170" y="115" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="48" font-weight="700" fill="#2C3E50" letter-spacing="-1">Lymphix</text>
+  <text x="171" y="142" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="500" fill="#7F8C8D" letter-spacing="2">BCR · TCR · CLONALITY</text>
+</svg>
+
+  <div class="titles">
+    <div class="brand">BCR / TCR Clonality Report</div>
+    <h1>POLYCLONAL_TEST</h1>
+    <div class="meta">
+      Generated 2026-05-13 21:00 &nbsp;|&nbsp;
+      Total input reads: 25,000 &nbsp;|&nbsp;
+      V(D)J assembled: 26,456 &nbsp;|&nbsp;
+      Min clone count: 2
+    </div>
+  </div>
+</header>
+
+<div class="verdict negative">
+  <h2>Polyclonal repertoire — no dominant clone detected</h2>
+  <ul><li>IGHV mutation status (CLL prognostic): <b>mutated</b> (18.3% unmutated)</li></ul>
+  
+</div>
+
+<section id="summary">
+  <h2>Aggregate summary</h2>
+  <p class="intro">Sample-level repertoire metrics (all seven loci pooled).</p>
+  <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr)">
+    
+      <div class="kpi"><div class="l">Clonotypes</div><div class="v">600</div></div>
+    
+      <div class="kpi"><div class="l">Reads</div><div class="v">26,456</div></div>
+    
+      <div class="kpi"><div class="l">Top clone %</div><div class="v">0.3%</div></div>
+    
+      <div class="kpi"><div class="l">Clonality index</div><div class="v">0.019</div></div>
+    
+      <div class="kpi"><div class="l">Shannon H</div><div class="v">6.277</div></div>
+    
+      <div class="kpi"><div class="l">Simpson D</div><div class="v">0.002</div></div>
+    
+      <div class="kpi"><div class="l">Gini</div><div class="v">0.273</div></div>
+    
+      <div class="kpi"><div class="l">D50</div><div class="v">193</div></div>
+    
+  </div>
+</section>
+
+<section id="composition">
+  <h2>1. Lineage composition</h2>
+  <p class="intro">B-cell vs T-cell vs background, clonal vs polyclonal sub-pools.
+     Eight pools sum to 100% of total input reads.</p>
+  <div class="card"><div>                            <div id="996c9e61-7156-4dd2-9b8e-fabcfc31880d" class="plotly-graph-div" style="height:210px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("996c9e61-7156-4dd2-9b8e-fabcfc31880d")) {                    Plotly.newPlot(                        "996c9e61-7156-4dd2-9b8e-fabcfc31880d",                        [{"customdata":[10979],"hovertemplate":"\u003cb\u003ePolyclonal B-cell\u003c\u002fb\u003e\u003cbr\u003e%{x:.2f}%\u003cbr\u003e%{customdata:,} reads\u003cextra\u003e\u003c\u002fextra\u003e","insidetextanchor":"middle","marker":{"color":"#D6EAF8","line":{"color":"white","width":1}},"name":"Polyclonal B-cell","orientation":"h","text":"43.9%","textposition":"inside","x":[43.916],"y":["POLYCLONAL_TEST"],"type":"bar"},{"customdata":[15477],"hovertemplate":"\u003cb\u003ePolyclonal T-cell\u003c\u002fb\u003e\u003cbr\u003e%{x:.2f}%\u003cbr\u003e%{customdata:,} reads\u003cextra\u003e\u003c\u002fextra\u003e","insidetextanchor":"middle","marker":{"color":"#FAD7A0","line":{"color":"white","width":1}},"name":"Polyclonal T-cell","orientation":"h","text":"61.9%","textposition":"inside","x":[61.907999999999994],"y":["POLYCLONAL_TEST"],"type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"range":[0,100],"title":{"text":"% of total reads"}},"legend":{"orientation":"h","y":-0.5},"barmode":"stack","yaxis":{"title":{"text":""}},"margin":{"l":40,"r":20,"t":46,"b":40},"height":210},                        {"displaylogo": false, "responsive": true}                    )                };            </script>        </div></div>
+  <div class="row equal" style="margin-top:10px">
+    <div class="card"><div>                            <div id="68004a09-3394-4117-8de9-08910ead4792" class="plotly-graph-div" style="height:380px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("68004a09-3394-4117-8de9-08910ead4792")) {                    Plotly.newPlot(                        "68004a09-3394-4117-8de9-08910ead4792",                        [{"customdata":[0,0,0,10979,0,0,15477,0],"direction":"clockwise","hole":0.55,"hovertemplate":"\u003cb\u003e%{label}\u003c\u002fb\u003e\u003cbr\u003e%{percent}\u003cbr\u003e%{customdata:,} reads\u003cextra\u003e\u003c\u002fextra\u003e","labels":["Clonal B-cell (IGH)","Clonal B-cell (\u03ba-restricted, IGK)","Clonal B-cell (\u03bb-restricted, IGL)","Polyclonal B-cell","Clonal T-cell (\u03b1\u03b2, TRB)","Clonal T-cell (\u03b3\u03b4, TRG\u002fTRD)","Polyclonal T-cell","Background \u002f germline"],"marker":{"colors":["#1B4F72","#2E86C1","#85C1E9","#D6EAF8","#922B21","#E67E22","#FAD7A0","#7F8C8D"]},"sort":false,"textinfo":"percent","textposition":"inside","values":[0.0,0.0,0.0,43.916,0.0,0.0,61.907999999999994,0.0],"type":"pie"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"annotations":[{"font":{"size":13},"showarrow":false,"text":"POLYCLONAL_TEST"}],"margin":{"l":40,"r":20,"t":46,"b":40},"height":380},                        {"displaylogo": false, "responsive": true}                    )                };            </script>        </div></div>
+    <div class="card"><div>                            <div id="e5f5d540-2623-42d0-ad29-d87de6b1791a" class="plotly-graph-div" style="height:420px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("e5f5d540-2623-42d0-ad29-d87de6b1791a")) {                    Plotly.newPlot(                        "e5f5d540-2623-42d0-ad29-d87de6b1791a",                        [{"link":{"source":[0,0,1,2],"target":[1,2,7,10],"value":[10979,15477,10979,15477]},"node":{"color":["#cccccc","#1B4F72","#922B21","#7F8C8D","#1B4F72","#2E86C1","#85C1E9","#D6EAF8","#922B21","#E67E22","#FAD7A0","#7F8C8D"],"label":["Total input","B-cell","T-cell","Background","Clonal B-cell (IGH)","Clonal B-cell (\u03ba-restricted, IGK)","Clonal B-cell (\u03bb-restricted, IGL)","Polyclonal B-cell","Clonal T-cell (\u03b1\u03b2, TRB)","Clonal T-cell (\u03b3\u03b4, TRG\u002fTRD)","Polyclonal T-cell","Background \u002f germline"],"pad":14,"thickness":14},"type":"sankey"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"margin":{"l":40,"r":20,"t":46,"b":40},"height":420},                        {"displaylogo": false, "responsive": true}                    )                };            </script>        </div></div>
+  </div>
+</section>
+
+<section id="topclones">
+  <h2>2. Top clones — BCR | TCR</h2>
+  <p class="intro">Top-ranked clonotypes per lineage, with V/D/J/CDR3 and read fraction.</p>
+  <div class="card"><div>                            <div id="e6a2e3b9-53a5-470c-a25b-5403d34090ea" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("e6a2e3b9-53a5-470c-a25b-5403d34090ea")) {                    Plotly.newPlot(                        "e6a2e3b9-53a5-470c-a25b-5403d34090ea",                        [{"customdata":[["IGHV3-23","IGHJ3","CNTMSMMHHF"],["IGHV4-39","IGHJ4","CQGFVTNRSRHGKTW"],["IGHV3-23","IGHJ6","CADMYCCSNSVSW"],["IGHV4-39","IGHJ3","CYFEERVKPWNYNKRIEF"],["IGHV1-2","IGHJ4","CKGWSCGPDKENDPF"],["IGHV3-30","IGHJ3","CGWFSVASKKINEALICQLGF"],["IGHV3-30","IGHJ6","CRWCQAMMVQEAEIDYTFCTQW"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eIGH\u003c\u002fextra\u003e","marker":{"color":"#1B4F72"},"name":"IGH","x":{"dtype":"i1","bdata":"AQIFBwwNDw=="},"y":{"dtype":"i1","bdata":"T09OTUxLSw=="},"type":"bar","xaxis":"x","yaxis":"y"},{"customdata":[["IGKV3-20","IGKJ4","CYHAMATPIWNIQSGMIKPPVW"],["IGKV3-20","IGKJ1","CEERKESKGTVSHQKF"],["IGKV3-15","IGKJ1","CGAEYQYEHYPEW"],["IGKV3-15","IGKJ1","CICKVKFTVTVIHMVKISF"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eIGK\u003c\u002fextra\u003e","marker":{"color":"#2E86C1"},"name":"IGK","x":{"dtype":"i1","bdata":"AwQJCg=="},"y":{"dtype":"i1","bdata":"T05NTA=="},"type":"bar","xaxis":"x","yaxis":"y"},{"customdata":[["IGLV3-21","IGLJ3","CDWIMDPPFWDCNRDYETKTW"],["IGLV1-40","IGLJ3","CVRMYRSFWEAKMF"],["IGLV3-21","IGLJ2","CGAEYSTLKHWTRISW"],["IGLV1-40","IGLJ3","CPHLGPMSSFRFRYF"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eIGL\u003c\u002fextra\u003e","marker":{"color":"#85C1E9"},"name":"IGL","x":{"dtype":"i1","bdata":"BggLDg=="},"y":{"dtype":"i1","bdata":"Tk1MSw=="},"type":"bar","xaxis":"x","yaxis":"y"},{"customdata":[["TRAV21","TRAJ23","CYCGPKMRYNVEW"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eTRA\u003c\u002fextra\u003e","marker":{"color":"#C0392B"},"name":"TRA","x":{"dtype":"i1","bdata":"CQ=="},"y":{"dtype":"i1","bdata":"Tw=="},"type":"bar","xaxis":"x2","yaxis":"y2"},{"customdata":[["TRBV20-1","TRBJ2-7","CAPKYRKMWNFKSWLFDNWHW"],["TRBV28","TRBJ2-1","CFLESCQTEQNKTDTNRW"],["TRBV9","TRBJ2-1","CHWFKTSKKMKTMVW"],["TRBV9","TRBJ2-1","CSVDLCQYKAHDDW"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eTRB\u003c\u002fextra\u003e","marker":{"color":"#922B21"},"name":"TRB","x":{"dtype":"i1","bdata":"BAUHDA=="},"y":{"dtype":"i1","bdata":"UFBPTg=="},"type":"bar","xaxis":"x2","yaxis":"y2"},{"customdata":[["TRGV2","TRGJ1","CRWHHANLHSKYKEFF"],["TRGV4","TRGJ1","CNEPRYQHRGMADYGIQW"],["TRGV9","TRGJP1","CYSISFCLSWF"],["TRGV2","TRGJP1","CPHTWLHRFHATW"],["TRGV9","TRGJP1","CEAICWCAAKFQW"],["TRGV9","TRGJP1","CYCHWTMMDNQMAF"],["TRGV9","TRGJP1","CGSASRNPCIASAPKRF"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eTRG\u003c\u002fextra\u003e","marker":{"color":"#E67E22"},"name":"TRG","x":{"dtype":"i1","bdata":"AQIDCA0ODw=="},"y":{"dtype":"i1","bdata":"UFBQT05OTQ=="},"type":"bar","xaxis":"x2","yaxis":"y2"},{"customdata":[["TRDV1","TRDJ2","CRVQALVNHWHGCF"],["TRDV1","TRDJ1","CNRCWEMERNYVRVWNF"],["TRDV3","TRDJ2","CEIGHTDIPACSGGTWNCKIVW"]],"hovertemplate":"Rank %{x}\u003cbr\u003eV: %{customdata[0]}\u003cbr\u003eJ: %{customdata[1]}\u003cbr\u003eCDR3: %{customdata[2]}\u003cbr\u003eReads: %{y:,}\u003cextra\u003eTRD\u003c\u002fextra\u003e","marker":{"color":"#F5B041"},"name":"TRD","x":{"dtype":"i1","bdata":"BgoL"},"y":{"dtype":"i1","bdata":"T09P"},"type":"bar","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.44],"title":{"text":"Rank"}},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"Reads"}},"xaxis2":{"anchor":"y2","domain":[0.56,1.0],"title":{"text":"Rank"}},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"Reads"}},"annotations":[{"font":{"size":16},"showarrow":false,"text":"BCR (IGH\u002fIGK\u002fIGL)","x":0.22,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"TCR (TRA\u002fTRB\u002fTRG\u002fTRD)","x":0.78,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"barmode":"stack","margin":{"l":40,"r":20,"t":46,"b":40},"height":400},                        {"displaylogo": false, "responsive": true}                    )                };            </script>        </div></div>
+  <div class="row" style="grid-template-columns: 1fr 1fr; margin-top:10px">
+    <div class="card bcr-only">
+      <h3>Top BCR clonotypes</h3>
+      <table class="clones">
+        <tr><th>Locus</th><th>V</th><th>D</th><th>J</th><th>CDR3 (aa)</th><th>Reads</th><th>% locus</th></tr>
+        <tr>
+          <td>IGH</td><td>IGHV3-23*01</td><td>IGHD6-19*01</td><td>IGHJ3*02</td>
+          <td><code>CNTMSMMHHF</code></td><td>79</td><td>1.8%</td>
+        </tr><tr>
+          <td>IGH</td><td>IGHV4-39*01</td><td>IGHD3-10*01</td><td>IGHJ4*02</td>
+          <td><code>CQGFVTNRSRHGKTW</code></td><td>79</td><td>1.8%</td>
+        </tr><tr>
+          <td>IGK</td><td>IGKV3-20*01</td><td>nan</td><td>IGKJ4*01</td>
+          <td><code>CYHAMATPIWNIQSGMIKPPVW</code></td><td>79</td><td>2.6%</td>
+        </tr><tr>
+          <td>IGK</td><td>IGKV3-20*01</td><td>nan</td><td>IGKJ1*01</td>
+          <td><code>CEERKESKGTVSHQKF</code></td><td>78</td><td>2.5%</td>
+        </tr><tr>
+          <td>IGH</td><td>IGHV3-23*01</td><td>IGHD2-2*01</td><td>IGHJ6*02</td>
+          <td><code>CADMYCCSNSVSW</code></td><td>78</td><td>1.8%</td>
+        </tr><tr>
+          <td>IGL</td><td>IGLV3-21*01</td><td>nan</td><td>IGLJ3*02</td>
+          <td><code>CDWIMDPPFWDCNRDYETKTW</code></td><td>78</td><td>2.2%</td>
+        </tr><tr>
+          <td>IGH</td><td>IGHV4-39*01</td><td>IGHD3-10*01</td><td>IGHJ3*02</td>
+          <td><code>CYFEERVKPWNYNKRIEF</code></td><td>77</td><td>1.8%</td>
+        </tr><tr>
+          <td>IGL</td><td>IGLV1-40*01</td><td>nan</td><td>IGLJ3*02</td>
+          <td><code>CVRMYRSFWEAKMF</code></td><td>77</td><td>2.1%</td>
+        </tr>
+        
+      </table>
+    </div>
+    <div class="card tcr-only">
+      <h3>Top TCR clonotypes</h3>
+      <table class="clones">
+        <tr><th>Locus</th><th>V</th><th>D</th><th>J</th><th>CDR3 (aa)</th><th>Reads</th><th>% locus</th></tr>
+        <tr>
+          <td>TRG</td><td>TRGV2*01</td><td>nan</td><td>TRGJ1*01</td>
+          <td><code>CRWHHANLHSKYKEFF</code></td><td>80</td><td>2.2%</td>
+        </tr><tr>
+          <td>TRG</td><td>TRGV4*01</td><td>nan</td><td>TRGJ1*01</td>
+          <td><code>CNEPRYQHRGMADYGIQW</code></td><td>80</td><td>2.2%</td>
+        </tr><tr>
+          <td>TRG</td><td>TRGV9*01</td><td>nan</td><td>TRGJP1*01</td>
+          <td><code>CYSISFCLSWF</code></td><td>80</td><td>2.2%</td>
+        </tr><tr>
+          <td>TRB</td><td>TRBV20-1*01</td><td>TRBD1*01</td><td>TRBJ2-7*01</td>
+          <td><code>CAPKYRKMWNFKSWLFDNWHW</code></td><td>80</td><td>1.7%</td>
+        </tr><tr>
+          <td>TRB</td><td>TRBV28*01</td><td>TRBD1*01</td><td>TRBJ2-1*01</td>
+          <td><code>CFLESCQTEQNKTDTNRW</code></td><td>80</td><td>1.7%</td>
+        </tr><tr>
+          <td>TRD</td><td>TRDV1*01</td><td>TRDD1*01</td><td>TRDJ2*01</td>
+          <td><code>CRVQALVNHWHGCF</code></td><td>79</td><td>2.1%</td>
+        </tr><tr>
+          <td>TRB</td><td>TRBV9*01</td><td>TRBD2*01</td><td>TRBJ2-1*01</td>
+          <td><code>CHWFKTSKKMKTMVW</code></td><td>79</td><td>1.7%</td>
+        </tr><tr>
+          <td>TRG</td><td>TRGV2*01</td><td>nan</td><td>TRGJP1*01</td>
+          <td><code>CPHTWLHRFHATW</code></td><td>79</td><td>2.2%</td>
+        </tr>
+        
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="cdr3">
+  <h2>3. CDR3 length spectratype</h2>
+  <p class="intro">Classical clonality fingerprint. Polyclonal repertoires show
+     Gaussian-shaped curves; clonal expansions produce sharp single-length spikes.
+     BCR loci in the top row; TCR in the bottom row.</p>
+  <div class="card"><div>                            <div id="fadfd6c7-097b-4b45-98ff-b3239e8eeaef" class="plotly-graph-div" style="height:460px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("fadfd6c7-097b-4b45-98ff-b3239e8eeaef")) {                    Plotly.newPlot(                        "fadfd6c7-097b-4b45-98ff-b3239e8eeaef",                        [{"marker":{"color":"#1B4F72"},"nbinsx":25,"x":{"dtype":"i1","bdata":"Cg8NEg8VFgoUFRMLEhILDQwUDhQSDhENEg4NFg8MCxITExYSCwwWEhUMDQwKChMKFg8TEQ0QERAVFRQRDBYOEhEREhYPDQoVCg4KEg4LFA4KDhQRExEQEAwMDA4LDBY="},"type":"histogram","xaxis":"x","yaxis":"y"},{"marker":{"color":"#2E86C1"},"nbinsx":25,"x":{"dtype":"i1","bdata":"FhANExQNFRQVFg4NDQoUFREOEBITFRQKExALFRAOFhAPDg4MDQ4UFhQVDBQPDg0TEhUQEQoVChUWEw4QFgwPEQ0TCwsWCxIPDwoN"},"type":"histogram","xaxis":"x2","yaxis":"y2"},{"marker":{"color":"#85C1E9"},"nbinsx":25,"x":{"dtype":"i1","bdata":"FQ4QDwsLDw8UDRMTDBQLDQoWFgoKFhISFQ0TERUKEhINDgsPERQPDBUOCwsTFA8WDxYMFhMQDw8TFQwMDxINFg0LDRYUERUSEhUKEwwPFBQKChE="},"type":"histogram","xaxis":"x3","yaxis":"y3"},{"marker":{"color":"#C0392B"},"nbinsx":25,"x":{"dtype":"i1","bdata":"DQ0KEA0KCxIKDBUQEgoVEgwLExYQDg0TERQKEBIWCxEQDQoKCg4UFRMOFAoPFAwVCwsRDAsLFQwREA4OFgsRCw8NEhIKDhMTExYSEw8MFA=="},"type":"histogram","xaxis":"x5","yaxis":"y5"},{"marker":{"color":"#922B21"},"nbinsx":25,"x":{"dtype":"i1","bdata":"FRIPDg8VCxYLCgsRDBAKExMMChYLExQOFg0MDxEQEg0NEAwSDhYWExURDA0MDRURERMOFQsVDxEVDhIRFA4RFBQNEgwLFBIUEREPDQ0PCxYNFhESEhYRFRARDRESEw8TCg0LDxM="},"type":"histogram","xaxis":"x6","yaxis":"y6"},{"marker":{"color":"#E67E22"},"nbinsx":25,"x":{"dtype":"i1","bdata":"EAsSDQ0OERYRDhYNFBUSDAsSDQ4KDgsRFQsODw8RFg0OCw4LFRIREhINExEKFAoNExYWDxISExAVDwsVCwsSDxANEBAQCg0VCg0KEg4UEw0PCxI="},"type":"histogram","xaxis":"x7","yaxis":"y7"},{"marker":{"color":"#F5B041"},"nbinsx":25,"x":{"dtype":"i1","bdata":"EQ4WFBQOChIQDRMMChYMFhYOEhIQExIPFg0PFBEOExAWEhANChITEA0ODQsKFg0TDBESFRYNFRATFAwPDRQODhARFQsUEg0KEQ0TEhIVDRAOFBEV"},"type":"histogram","xaxis":"x8","yaxis":"y8"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.20500000000000002]},"yaxis":{"anchor":"x","domain":[0.5900000000000001,1.0]},"xaxis2":{"anchor":"y2","domain":[0.265,0.47000000000000003]},"yaxis2":{"anchor":"x2","domain":[0.5900000000000001,1.0]},"xaxis3":{"anchor":"y3","domain":[0.53,0.7350000000000001]},"yaxis3":{"anchor":"x3","domain":[0.5900000000000001,1.0]},"xaxis4":{"anchor":"y4","domain":[0.7949999999999999,1.0]},"yaxis4":{"anchor":"x4","domain":[0.5900000000000001,1.0]},"xaxis5":{"anchor":"y5","domain":[0.0,0.20500000000000002],"title":{"text":"CDR3 length (aa)"}},"yaxis5":{"anchor":"x5","domain":[0.0,0.41000000000000003]},"xaxis6":{"anchor":"y6","domain":[0.265,0.47000000000000003],"title":{"text":"CDR3 length (aa)"}},"yaxis6":{"anchor":"x6","domain":[0.0,0.41000000000000003]},"xaxis7":{"anchor":"y7","domain":[0.53,0.7350000000000001],"title":{"text":"CDR3 length (aa)"}},"yaxis7":{"anchor":"x7","domain":[0.0,0.41000000000000003]},"xaxis8":{"anchor":"y8","domain":[0.7949999999999999,1.0],"title":{"text":"CDR3 length (aa)"}},"yaxis8":{"anchor":"x8","domain":[0.0,0.41000000000000003]},"annotations":[{"font":{"size":16},"showarrow":false,"text":"IGH","x":0.10250000000000001,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"IGK","x":0.36750000000000005,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"IGL","x":0.6325000000000001,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"TRA","x":0.10250000000000001,"xanchor":"center","xref":"paper","y":0.41000000000000003,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"TRB","x":0.36750000000000005,"xanchor":"center","xref":"paper","y":0.41000000000000003,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"TRG","x":0.6325000000000001,"xanchor":"center","xref":"paper","y":0.41000000000000003,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"TRD","x":0.8975,"xanchor":"center","xref":"paper","y":0.41000000000000003,"yanchor":"bottom","yref":"paper"}],"showlegend":false,"margin":{"l":40,"r":20,"t":46,"b":40},"height":460},                        {"displaylogo": false, "responsive": true}                    )                };            </script>        </div></div>
+</section>
+
+<section id="locus_table">
+  <h2>4. Per-locus summary table</h2>
+  <p class="intro">Per-locus clonality metrics. BCR loci first, then TCR.</p>
+  <div class="card">
+    <table class="clones">
+      <tr>
+        <th>Locus</th><th>Lineage</th><th>Clonotypes</th><th>Reads</th>
+        <th>Top clone %</th><th>Clonality</th><th>Shannon H</th>
+        <th>Simpson D</th><th>Gini</th><th>D50</th>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #1B4F72; padding-left:8px">
+          <b>IGH</b></td>
+        <td>BCR</td>
+        <td>95</td>
+        <td>4,286</td>
+        <td>1.8%</td>
+        <td>0.025</td>
+        <td>4.442</td>
+        <td>0.013</td>
+        <td>0.261</td>
+        <td>32</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #2E86C1; padding-left:8px">
+          <b>IGK</b></td>
+        <td>BCR</td>
+        <td>75</td>
+        <td>3,073</td>
+        <td>2.6%</td>
+        <td>0.032</td>
+        <td>4.180</td>
+        <td>0.017</td>
+        <td>0.293</td>
+        <td>24</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #85C1E9; padding-left:8px">
+          <b>IGL</b></td>
+        <td>BCR</td>
+        <td>83</td>
+        <td>3,620</td>
+        <td>2.2%</td>
+        <td>0.025</td>
+        <td>4.309</td>
+        <td>0.015</td>
+        <td>0.261</td>
+        <td>28</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #C0392B; padding-left:8px">
+          <b>TRA</b></td>
+        <td>TCR</td>
+        <td>79</td>
+        <td>3,357</td>
+        <td>2.4%</td>
+        <td>0.023</td>
+        <td>4.269</td>
+        <td>0.015</td>
+        <td>0.252</td>
+        <td>26</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #922B21; padding-left:8px">
+          <b>TRB</b></td>
+        <td>TCR</td>
+        <td>101</td>
+        <td>4,732</td>
+        <td>1.7%</td>
+        <td>0.022</td>
+        <td>4.512</td>
+        <td>0.012</td>
+        <td>0.252</td>
+        <td>34</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #E67E22; padding-left:8px">
+          <b>TRG</b></td>
+        <td>TCR</td>
+        <td>83</td>
+        <td>3,602</td>
+        <td>2.2%</td>
+        <td>0.033</td>
+        <td>4.275</td>
+        <td>0.015</td>
+        <td>0.300</td>
+        <td>26</td>
+      </tr>
+      
+      
+      <tr>
+        <td style="border-left:4px solid #F5B041; padding-left:8px">
+          <b>TRD</b></td>
+        <td>TCR</td>
+        <td>84</td>
+        <td>3,786</td>
+        <td>2.1%</td>
+        <td>0.031</td>
+        <td>4.294</td>
+        <td>0.015</td>
+        <td>0.287</td>
+        <td>27</td>
+      </tr>
+      
+    </table>
+  </div>
+</section>
+
+
+<section id="ighv_table">
+  <h2>5. IGHV mutation status</h2>
+  <p class="intro">CLL prognostic indicator. ≥98.0% V-identity
+     = unmutated (poor prognosis); below = mutated (favourable).</p>
+  <div class="card">
+    <table class="clones">
+      <tr><th>Reads total</th><th>Unmutated</th><th>Mutated</th><th>Unknown</th>
+          <th>% unmutated</th><th>Dominant call</th></tr>
+      <tr>
+        <td>4,286</td>
+        <td>785</td>
+        <td>3,501</td>
+        <td>0</td>
+        <td>18.3%</td>
+        <td style="font-weight:bold; color:#27ae60">
+          mutated</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+
+<footer>
+  <div class="footer-meta">
+    Lymphix v0.1.0 · TRUST4 + IgBLAST · Generated 2026-05-13 21:00 ·
+    <span class="name">Dr C.S. Trethewey</span>
+  </div>
+  <div class="footer-meta">
+    Clonal threshold: per-locus clonality index ≥ 0.30,
+    top-clone fraction ≥ 20% ·
+    Composition threshold: per-clone ≥ 5% of locus
+  </div>
+</footer>
+
+</body></html>
