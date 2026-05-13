@@ -26,26 +26,53 @@ DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 
 ## Sample sheet
 
-`samples.csv`:
+A CSV with one row per sample. **Copy the example below that matches your
+case** — omit columns you don't need.
+
+#### Plain paired FASTQ (most common)
 
 ```csv
-sample_id,fastq_1,fastq_2,bam,umi_preset,expected_status
-PT001,/data/PT001_R1.fq.gz,/data/PT001_R2.fq.gz,,none,
-PT002,/data/PT002_R1.fq.gz,/data/PT002_R2.fq.gz,,twist,
-PT003,,,/data/PT003.bam,none,
-NEG,,,/data/blank.bam,none,negative
+sample_id,fastq_1,fastq_2
+PT001,/data/PT001_R1.fq.gz,/data/PT001_R2.fq.gz
+PT002,/data/PT002_R1.fq.gz,/data/PT002_R2.fq.gz
 ```
 
-| Column | Required | Values |
-|---|---|---|
-| `sample_id`         | yes | Unique per row |
-| `fastq_1`,`fastq_2` | one-of | Paired Illumina reads (gz ok) **or** use `bam` |
-| `bam`               | one-of | Aligned BAM (sorted + indexed), hg38/GRCh38 |
-| `umi_preset`        | no | `none` (default), `twist`, `xgen_duplex`, `xgen_simplex`, `custom` |
-| `expected_status`   | no | `clonal` / `polyclonal` / `negative` — drives QC assertions |
+#### Pre-aligned BAM
 
-`bam + umi_preset != none` is rejected — UMI processing needs inline UMI bases.
-Annotated examples in [`assets/samplesheet_template.csv`](assets/samplesheet_template.csv).
+```csv
+sample_id,bam
+PT003,/data/PT003.bam
+```
+
+#### TWIST or IDT xGen UMI library
+
+```csv
+sample_id,fastq_1,fastq_2,umi_preset
+PT004,/data/PT004_R1.fq.gz,/data/PT004_R2.fq.gz,twist
+PT005,/data/PT005_R1.fq.gz,/data/PT005_R2.fq.gz,xgen_duplex
+```
+
+#### Run with validation controls
+
+```csv
+sample_id,fastq_1,fastq_2,bam,expected_status
+PT006,/data/PT006_R1.fq.gz,/data/PT006_R2.fq.gz,,
+JURKAT,/data/jurkat_R1.fq.gz,/data/jurkat_R2.fq.gz,,clonal
+NEG,,,/data/blank.bam,negative
+```
+
+#### Columns
+
+| Column | When you need it | Values |
+|---|---|---|
+| `sample_id` | always | short label, no spaces |
+| `fastq_1`,`fastq_2` | if you have FASTQs | paths (`.gz` OK) |
+| `bam` | if you have aligned BAMs | path (sorted + indexed) |
+| `umi_preset` | only if UMI chemistry | `twist`, `xgen_duplex`, `xgen_simplex`, `custom` |
+| `expected_status` | only for controls | `clonal`, `polyclonal`, `negative` |
+
+A row must have **either FASTQ or BAM, not both**. UMI presets require FASTQ
+(BAMs are already aligned; UMI bases need to come from inline reads).
 
 ## What it does
 
