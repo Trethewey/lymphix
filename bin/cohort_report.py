@@ -10,7 +10,7 @@ Render a self-contained HTML cohort overview from per-sample
   * Per-locus clonality-index heatmap
 """
 from __future__ import annotations
-import argparse, json
+import argparse, json, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -161,6 +161,18 @@ def build_clonality_heatmap(samples: dict[str, dict]) -> go.Figure:
     return fig
 
 
+def find_logo() -> str:
+    """Return inline SVG logo content, or empty string if not found.
+    Looks at <script_dir>/../assets/logo.svg (the repo layout)."""
+    candidate = Path(__file__).resolve().parent.parent / "assets" / "logo.svg"
+    if not candidate.exists():
+        return ""
+    try:
+        return candidate.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 def render(samples: dict[str, dict], out: Path) -> None:
     n_pass = sum(1 for s in samples.values() if s.get("pass"))
     n_total = len(samples)
@@ -168,29 +180,68 @@ def render(samples: dict[str, dict], out: Path) -> None:
     comp_html  = build_composition(samples).to_html(include_plotlyjs=False, full_html=False, div_id="comp")
     heat_html  = build_clonality_heatmap(samples).to_html(include_plotlyjs=False, full_html=False, div_id="heat")
     plotly_js = get_plotlyjs()
+    logo_svg  = find_logo()
+    stamp     = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    status_cls = "pass" if n_pass == n_total else "fail"
+    badge_label = "PASS" if n_pass == n_total else "FAIL"
 
-    html = f"""<!doctype html><meta charset="utf-8">
-<title>Lymphix validation cohort overview</title>
+    html = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Lymphix - validation cohort overview</title>
 <style>
-  body {{ font-family: -apple-system, Segoe UI, sans-serif; margin: 24px; color: #222; }}
-  h1   {{ margin: 0 0 4px 0; font-size: 22px; }}
-  h2   {{ margin: 28px 0 8px 0; font-size: 16px; color: #1f4e79; }}
-  .meta {{ color: #666; font-size: 13px; margin-bottom: 18px; }}
-  .pass {{ color: #2e7d32; font-weight: 600; }}
-  .fail {{ color: #c62828; font-weight: 600; }}
-  .card {{ border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; margin-bottom: 18px; background: #fff; }}
+  :root {{
+    --ink: #1f2937;
+    --ink-soft: #475569;
+    --brand: #1f4e79;
+    --brand-soft: #2e75b6;
+    --pass: #166534;
+    --fail: #991b1b;
+    --rule: #e2e8f0;
+    --card: #ffffff;
+    --bg: #f7fafc;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 32px 40px 48px; color: var(--ink);
+         background: var(--bg); }}
+  header {{ display: flex; align-items: center; gap: 20px;
+            padding-bottom: 20px; border-bottom: 1px solid var(--rule);
+            margin-bottom: 24px; }}
+  header .logo svg {{ width: 200px; height: auto; display: block; }}
+  header h1 {{ margin: 0; font-size: 24px; color: var(--brand); }}
+  header .subtitle {{ margin-top: 4px; color: var(--ink-soft); font-size: 14px; }}
+  .badge {{ display: inline-block; padding: 4px 10px; border-radius: 4px;
+           font-weight: 600; font-size: 12px; letter-spacing: 0.4px; margin-left: 8px; }}
+  .badge.pass {{ background: #dcfce7; color: var(--pass); }}
+  .badge.fail {{ background: #fee2e2; color: var(--fail); }}
+  h2 {{ margin: 0 0 12px 0; font-size: 15px; color: var(--brand);
+        text-transform: uppercase; letter-spacing: 0.6px; }}
+  .card {{ background: var(--card); border: 1px solid var(--rule);
+          border-radius: 8px; padding: 18px 20px;
+          margin-bottom: 18px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }}
+  footer {{ margin-top: 24px; color: var(--ink-soft); font-size: 12px;
+            text-align: right; }}
 </style>
 <script>{plotly_js}</script>
+</head><body>
 
-<h1>Lymphix — validation cohort overview</h1>
-<div class="meta">
-  {n_total} samples ·
-  <span class="{'pass' if n_pass == n_total else 'fail'}">{n_pass}/{n_total} pass</span>
-</div>
+<header>
+  <div class="logo">{logo_svg}</div>
+  <div>
+    <h1>Validation cohort overview
+      <span class="badge {status_cls}">{badge_label}</span>
+    </h1>
+    <div class="subtitle">{n_total} samples - {n_pass}/{n_total} pass - generated {stamp}</div>
+  </div>
+</header>
 
 <div class="card"><h2>Verdict table</h2>{table_html}</div>
 <div class="card"><h2>Lineage composition</h2>{comp_html}</div>
 <div class="card"><h2>Per-locus clonality index</h2>{heat_html}</div>
+
+<footer>Lymphix - github.com/Trethewey/lymphix</footer>
+
+</body></html>
 """
     out.write_text(html, encoding="utf-8")
     print(f"[cohort_report] wrote {out}  ({n_pass}/{n_total} pass)")
