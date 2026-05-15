@@ -172,12 +172,16 @@ The current cohort overview is at
 table, lineage-composition stacked bar, and per-locus clonality-index
 heatmap on one self-contained page.
 
-GitHub serves `.html` as source, not rendered. To view in the browser
-without cloning:
+GitHub serves `.html` as source, not rendered. To view in a browser:
 
-- **Rendered preview** (3rd-party proxy):
-  [htmlpreview.github.io / cohort_overview.html](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/cohort_overview.html)
-- **Download:** open the file on GitHub → click *Raw* → save → open locally.
+- **Hosted preview** (once Pages is enabled on this repo):
+  [trethewey.github.io/lymphix/](https://trethewey.github.io/lymphix/)
+- **Locally:** clone the repo, or download the file via
+  *Raw → Save as → open*.
+
+To enable Pages: repo *Settings → Pages → Source: deploy from branch
+`main`, folder `/`*. After ~1 minute the landing page and cohort overview
+are served from the URL above.
 
 ## Panel BED
 

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Lymphix</title>
+<style>
+  :root { --brand:#1f4e79; --ink:#1f2937; --soft:#475569; --rule:#e2e8f0; --bg:#f7fafc; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 48px 32px; color: var(--ink); background: var(--bg);
+         max-width: 760px; margin-left: auto; margin-right: auto; }
+  header { display: flex; align-items: center; gap: 20px; margin-bottom: 28px; }
+  header svg { width: 220px; height: auto; }
+  h1 { margin: 0; color: var(--brand); font-size: 26px; }
+  .lead { color: var(--soft); margin: 6px 0 0 0; font-size: 14px; }
+  .card { background: #fff; border: 1px solid var(--rule); border-radius: 8px;
+          padding: 18px 22px; margin: 14px 0;
+          box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .card h2 { margin: 0 0 8px 0; font-size: 16px; color: var(--brand); }
+  .card a  { color: var(--brand); font-weight: 600; text-decoration: none; }
+  .card a:hover { text-decoration: underline; }
+  code { background: #eef2f7; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  footer { color: var(--soft); font-size: 12px; text-align: right; margin-top: 32px; }
+</style>
+</head><body>
+
+<header>
+  <img src="assets/logo.svg" alt="Lymphix">
+</header>
+
+<h1>Lymphix</h1>
+<p class="lead">BCR / TCR clonality and V(D)J rearrangement calling from
+2 x 150 bp Illumina DNA capture NGS.</p>
+
+<div class="card">
+  <h2>Validation cohort overview</h2>
+  <p>Eleven samples (nine hematological cell lines plus a no-signal and a
+  synthetic polyclonal control). Verdict table, lineage-composition stack,
+  and per-locus clonality-index heatmap on one self-contained page.</p>
+  <p><a href="examples/cohort_overview.html">View cohort overview &rarr;</a></p>
+</div>
+
+<div class="card">
+  <h2>Source &amp; documentation</h2>
+  <p><a href="https://github.com/Trethewey/lymphix">github.com/Trethewey/lymphix</a>
+     - install, usage, samplesheets, citations.</p>
+  <p>DNAnexus deployment: <a href="https://github.com/Trethewey/lymphix/blob/main/docs/DNANEXUS.md">docs/DNANEXUS.md</a>.</p>
+</div>
+
+<footer>MIT licence - Lymphix</footer>
+
+</body></html>
