@@ -167,10 +167,17 @@ Run end-to-end (downloads ~25 GB from ENA, ~1 h):
 tests/run_validation_cohort.sh [DATA_DIR]
 ```
 
-The current cohort overview is published at
-[`examples/cohort_overview.html`](examples/cohort_overview.html) (open in
-a browser): verdict table, lineage-composition stacked bar, and per-locus
-clonality-index heatmap, all on one page.
+The current cohort overview is at
+[`examples/cohort_overview.html`](examples/cohort_overview.html) — verdict
+table, lineage-composition stacked bar, and per-locus clonality-index
+heatmap on one self-contained page.
+
+GitHub serves `.html` as source, not rendered. To view in the browser
+without cloning:
+
+- **Rendered preview** (3rd-party proxy):
+  [htmlpreview.github.io / cohort_overview.html](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/cohort_overview.html)
+- **Download:** open the file on GitHub → click *Raw* → save → open locally.
 
 ## Panel BED
 
