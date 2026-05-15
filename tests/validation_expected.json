@@ -1,8 +1,10 @@
 {
-  "_doc": "Ground-truth expectations per validation sample. Used by run_validation_cohort.sh to grade pipeline outputs.",
+  "schema_version": "1.0",
   "samples": {
     "JURKAT": {
-      "biology": "T-ALL cell line, monoclonal at TRA + TRB",
+      "cellosaurus": "CVCL_0065",
+      "reference": "Schneider U et al. Int J Cancer 1977; 19(5):621-626. PMID 68013",
+      "biology": "T-ALL line; monoclonal TRA + TRB. Published TRB: TRBV12-3 / TRBJ1-2 / CASSFSTCSANYGYTF.",
       "expected_verdict_category": "clonal",
       "expected_clonal_loci_any_of": ["TRB", "TRA"],
       "expected_top_clones": [
@@ -11,37 +13,108 @@
       ],
       "expected_ighv_reportable": false
     },
+    "MOLT-4": {
+      "cellosaurus": "CVCL_0013",
+      "reference": "Minowada J et al. J Natl Cancer Inst 1972; 49(3):891-895. PMID 4567531",
+      "biology": "T-ALL line; monoclonal TRB rearrangement.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["TRB"],
+      "expected_top_clones": [{"locus": "TRB", "v_call_pattern": "TRB"}],
+      "expected_ighv_reportable": false
+    },
+    "KARPAS-299": {
+      "cellosaurus": "CVCL_1324",
+      "reference": "Fischer P et al. Blood 1988; 72(1):234-240. PMID 3289586",
+      "biology": "Anaplastic large-cell lymphoma (ALCL), NPM-ALK positive; monoclonal TCR.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["TRB", "TRA"],
+      "expected_top_clones": [{"locus": "TRB", "v_call_pattern": "TRB"}],
+      "expected_ighv_reportable": false
+    },
     "NAMALWA": {
-      "biology": "Burkitt B-cell lymphoma cell line, monoclonal IGH (and IGK/IGL)",
+      "cellosaurus": "CVCL_0067",
+      "reference": "Klein E et al. Cancer Res 1972; 32(11):2470-2476. PMID 4567530",
+      "biology": "Burkitt B-cell lymphoma; monoclonal IGH and IGK.",
       "expected_verdict_category": "clonal",
       "expected_clonal_loci_any_of": ["IGH"],
-      "expected_top_clones": [
-        {"locus": "IGH", "v_call_pattern": "IGHV", "j_call_pattern": "IGHJ"}
-      ],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV", "j_call_pattern": "IGHJ"}],
       "expected_ighv_reportable": true
     },
     "DAUDI": {
-      "biology": "Burkitt B-cell lymphoma cell line. Monoclonal IGH (specific V allele varies in literature; consensus is heavily-SHM'd IGHV gene, often IGHV3 or IGHV4 family). Originally derived 1968; subcloning across labs has produced slight variation.",
+      "cellosaurus": "CVCL_0008",
+      "reference": "Klein E et al. Cancer Res 1968; 28(7):1300-1310. PMID 5662921",
+      "biology": "Burkitt B-cell lymphoma; monoclonal IGH, heavily SHM-mutated.",
       "expected_verdict_category": "clonal",
       "expected_clonal_loci_any_of": ["IGH"],
-      "expected_top_clones": [
-        {"locus": "IGH", "v_call_pattern": "IGHV"}
-      ],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV"}],
       "expected_ighv_reportable": true,
       "expected_ighv_status": "mutated"
     },
+    "RAJI": {
+      "cellosaurus": "CVCL_0511",
+      "reference": "Pulvertaft RJV. Lancet 1964; 1(7327):238-240. PMID 14086209",
+      "biology": "Burkitt B-cell lymphoma; monoclonal IGH, heavily SHM-mutated.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV"}],
+      "expected_ighv_reportable": true,
+      "expected_ighv_status": "mutated"
+    },
+    "OCI-LY1": {
+      "cellosaurus": "CVCL_1879",
+      "reference": "Tweeddale ME et al. Blood 1987; 69(5):1307-1314. PMID 3552076",
+      "biology": "Germinal-centre DLBCL; monoclonal IGH (typically mutated IGHV).",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV"}],
+      "expected_ighv_reportable": true
+    },
+    "U-266": {
+      "cellosaurus": "CVCL_0566",
+      "reference": "Nilsson K et al. Int J Cancer 1970; 5(2):285-298. PMID 5424545",
+      "biology": "Multiple myeloma, IgE-secreting; monoclonal IGH.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV"}],
+      "expected_ighv_reportable": true
+    },
+    "MM.1S": {
+      "cellosaurus": "CVCL_8792",
+      "reference": "Goldman-Leikin RE et al. J Lab Clin Med 1989; 113(3):335-345. PMID 2926238",
+      "biology": "Multiple myeloma; monoclonal IGH.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [{"locus": "IGH", "v_call_pattern": "IGHV"}],
+      "expected_ighv_reportable": true
+    },
     "PBMC_HEALTHY": {
-      "biology": "Healthy donor peripheral blood (CellPlex 3'-biased RNA-seq). With 3'-biased libraries the IG/TCR 5' ends are not sequenced, so V(D)J yield is expected to be zero. Pipeline should produce no_signal — the correct clinical answer for this library type.",
+      "reference": "SRA SRR26965686 (CellPlex 3' single-cell RNA-seq)",
+      "biology": "Healthy peripheral blood; 3'-biased library. V(D)J 5' ends not sequenced, so zero V(D)J yield is the correct outcome for this chemistry.",
       "expected_verdict_category_any_of": ["no_signal", "no_clonal"],
+      "expected_clonal_loci_any_of": [],
+      "expected_top_clones": [],
+      "expected_ighv_reportable": false
+    },
+    "POLYCLONAL_SIM": {
+      "reference": "Generated by bin/simulate_repertoire.py from TRUST4 human_IMGT+C.fa germline (seed 7).",
+      "biology": "Synthetic polyclonal repertoire (~16,000 clones, uniform low abundance, all 7 loci).",
+      "expected_verdict_category": "no_clonal",
       "expected_clonal_loci_any_of": [],
       "expected_top_clones": [],
       "expected_ighv_reportable": false
     }
   },
   "samplesheet": {
-    "JURKAT":       {"sra": "ERR3931301",   "paired": true,  "approx_gb": 0.7},
-    "NAMALWA":      {"sra": "SRR387396",    "paired": true,  "approx_gb": 2.5},
-    "DAUDI":        {"sra": "SRR17188123",  "paired": true,  "approx_gb": 2.4},
-    "PBMC_HEALTHY": {"sra": "SRR26965686",  "paired": true,  "approx_gb": 3.0}
+    "JURKAT":        {"sra": "ERR3931301",  "approx_gb_combined": 0.7, "lineage": "T-cell positive"},
+    "MOLT-4":        {"sra": "SRR25601594", "approx_gb_combined": 1.0, "lineage": "T-cell positive"},
+    "KARPAS-299":    {"sra": "DRR505206",   "approx_gb_combined": 2.3, "lineage": "T-cell positive"},
+    "NAMALWA":       {"sra": "SRR387396",   "approx_gb_combined": 2.5, "lineage": "B-cell positive"},
+    "DAUDI":         {"sra": "SRR17188123", "approx_gb_combined": 2.4, "lineage": "B-cell positive"},
+    "RAJI":          {"sra": "SRR387394",   "approx_gb_combined": 1.9, "lineage": "B-cell positive"},
+    "OCI-LY1":       {"sra": "SRR17084931", "approx_gb_combined": 1.6, "lineage": "B-cell positive"},
+    "U-266":         {"sra": "SRR25601616", "approx_gb_combined": 1.1, "lineage": "B-cell positive"},
+    "MM.1S":         {"sra": "SRR13272091", "approx_gb_combined": 0.7, "lineage": "B-cell positive"},
+    "PBMC_HEALTHY":  {"sra": "SRR26965686", "approx_gb_combined": 3.0, "lineage": "no-signal control"},
+    "POLYCLONAL_SIM":{"sra": "synthetic",   "approx_gb_combined": 0.05,"lineage": "polyclonal positive control"}
   }
 }

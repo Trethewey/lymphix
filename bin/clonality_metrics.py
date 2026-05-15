@@ -77,38 +77,32 @@ def is_germline_rearrangement(row: dict, *,
                               min_v_identity: float = 85.0,
                               min_junction_diversity: int = 3) -> tuple[bool, str]:
     """
-    Heuristic detector for germline-rearrangement artefacts (sterile V-J
-    transcripts / unrearranged-DNA reads assembled by TRUST4 as if they were
-    real clonotypes).
+    Detect sterile V-J fusions (germline-rearrangement artefacts).
 
-    Returns (is_artefact, reason). Three thresholds, any one triggers:
-      * V alignment length too short — TRUST4 forced a V call from minimal evidence
-      * V identity too low           — V doesn't actually match well
-      * Junction diversity too low   — CDR3 is essentially V Cys + J stem with no N-region
+    A clone is flagged only if all three signatures are present together:
+      * V alignment shorter than min_v_match nt
+      * V identity at or above min_v_identity %  (near-germline)
+      * Junction diversity below min_junction_diversity nt
 
-    Each threshold has been validated on a CAPP-seq cohort where 5 real
-    Richter's tumour samples cleared all three filters and 25 germline
-    samples were flagged by all three simultaneously.
+    The conjunction is required because somatic hypermutation in real B-cell
+    lymphomas drops v_identity below 85% on its own.
     """
+    junction = row.get("junction") or ""
+    j_stem   = _j_stem_estimate(row.get("j_call"))
+    diversity = len(junction) - 3 - j_stem
     v_match = _cigar_total_match(row.get("v_cigar"))
-    if v_match < min_v_match:
-        return True, f"V alignment {v_match} nt < {min_v_match}"
-
     try:
         v_id = float(row.get("v_identity") or 0)
     except (ValueError, TypeError):
         v_id = 0.0
-    if v_id < min_v_identity:
-        return True, f"V identity {v_id:.1f}% < {min_v_identity}%"
 
-    junction = row.get("junction") or ""
-    j_stem   = _j_stem_estimate(row.get("j_call"))
-    # CDR3 = V Cys codon (3 nt) + N1 + D + N2 + J stem
-    # Diversity = junction length minus V (3 nt) minus J (estimated stem)
-    diversity = len(junction) - 3 - j_stem
-    if diversity < min_junction_diversity:
-        return True, f"junction diversity {diversity} nt < {min_junction_diversity} (CDR3 ≈ V Cys + J stem)"
+    short_v       = v_match < min_v_match
+    sterile_junc  = diversity < min_junction_diversity
+    germline_v_id = v_id >= min_v_identity
 
+    if short_v and sterile_junc and germline_v_id:
+        return True, (f"V={v_match}nt id={v_id:.1f}% junc_div={diversity}nt "
+                      f"(short V + germline-identity + sterile junction)")
     return False, "ok"
 
 
@@ -260,12 +254,10 @@ def build_clonotype_table(trust4: pd.DataFrame, igblast: pd.DataFrame) -> pd.Dat
 
 
 # ---------------------------------------------------------------------------
-# Read-length awareness — Phase 1 of the long-CDR3 confidence framework
+# Read-length awareness
 # ---------------------------------------------------------------------------
-# A clone's CDR3 is "spanned by a single read" if the read length can cover
-# the junction plus a minimal V- and J-anchor on either side. Anchor padding
-# is the number of nt required to confidently identify the V and J segments;
-# 15 nt each is a common threshold.
+# A CDR3 is "spanned by a single read" if read_length covers the junction
+# plus a V- and J-anchor on either side (15 nt each is a common threshold).
 SINGLE_READ_SPAN_ANCHOR_NT = 15
 
 
@@ -301,44 +293,68 @@ def adaptive_min_v_match(read_length: int) -> int:
     return int(max(20, min(200, round(read_length * 0.65))))
 
 
+_CIGAR_M_RE = re.compile(r"(\d+)M")
+
+
+def _cigar_match_vec(s: pd.Series) -> np.ndarray:
+    """Vectorised sum of all 'M' operations in each CIGAR string."""
+    return s.fillna("").astype(str).map(
+        lambda c: sum(int(n) for n in _CIGAR_M_RE.findall(c)) if c else 0
+    ).to_numpy(dtype=np.int32)
+
+
+def _j_stem_vec(s: pd.Series) -> np.ndarray:
+    """Vectorised J-stem length lookup. Strips allele and gene-list suffixes,
+    then falls back to a family-prefix scan, defaulting to 21 nt."""
+    names = s.fillna("").astype(str).str.split("*", n=1).str[0].str.split(",", n=1).str[0]
+    out = names.map(J_STEM_NT)
+    if out.isna().any():
+        prefixes = sorted(J_STEM_NT.keys(), key=len, reverse=True)
+        def fam(name: str) -> int:
+            for p in prefixes:
+                if name.startswith(p):
+                    return J_STEM_NT[p]
+            return 21
+        out = out.where(out.notna(), names.map(fam))
+    return out.to_numpy(dtype=np.int32)
+
+
 def apply_germline_rearrangement_filter(df: pd.DataFrame, *,
                                          min_v_match: int = 100,
                                          min_v_identity: float = 85.0,
                                          min_junction_diversity: int = 3) -> tuple[pd.DataFrame, dict]:
-    """Mark + drop clones that look like germline-rearrangement artefacts.
-    Returns (filtered_df, summary_stats)."""
+    """Drop sterile V-J artefacts. Returns (filtered_df, summary_stats)."""
+    thresholds = {
+        "min_v_match":            min_v_match,
+        "min_v_identity":         min_v_identity,
+        "min_junction_diversity": min_junction_diversity,
+    }
     if df.empty:
-        return df, {"n_input": 0, "n_dropped": 0, "n_kept": 0, "by_reason": {},
-                     "thresholds": {
-                         "min_v_match":            min_v_match,
-                         "min_v_identity":         min_v_identity,
-                         "min_junction_diversity": min_junction_diversity,
-                     }}
+        return df, {"n_input": 0, "n_dropped": 0, "n_kept": 0,
+                    "by_reason": {}, "thresholds": thresholds}
 
-    flags = df.apply(
-        lambda r: is_germline_rearrangement(
-            r.to_dict(),
-            min_v_match=min_v_match,
-            min_v_identity=min_v_identity,
-            min_junction_diversity=min_junction_diversity),
-        axis=1)
-    is_artefact = flags.map(lambda x: x[0])
-    reasons     = flags.map(lambda x: x[1])
+    v_match  = _cigar_match_vec(df["v_cigar"])
+    j_stem   = _j_stem_vec(df["j_call"])
+    junc_len = df["junction"].fillna("").astype(str).str.len().to_numpy(dtype=np.int32)
+    diversity = junc_len - 3 - j_stem
+    v_id = pd.to_numeric(df["v_identity"], errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
 
-    n_input   = len(df)
+    short_v       = v_match < min_v_match
+    sterile_junc  = diversity < min_junction_diversity
+    germline_v_id = v_id >= min_v_identity
+    is_artefact   = short_v & sterile_junc & germline_v_id
+
     n_dropped = int(is_artefact.sum())
-    by_reason = reasons[is_artefact].value_counts().to_dict()
-    kept = df[~is_artefact].reset_index(drop=True)
+    by_reason = ({f"short V + germline-identity + sterile junction "
+                  f"(<{min_v_match}nt / >={min_v_identity}% / <{min_junction_diversity}nt)": n_dropped}
+                 if n_dropped else {})
+    kept = df.loc[~is_artefact].reset_index(drop=True)
     return kept, {
-        "n_input":    n_input,
+        "n_input":    len(df),
         "n_dropped":  n_dropped,
         "n_kept":     int(len(kept)),
         "by_reason":  by_reason,
-        "thresholds": {
-            "min_v_match":            min_v_match,
-            "min_v_identity":         min_v_identity,
-            "min_junction_diversity": min_junction_diversity,
-        },
+        "thresholds": thresholds,
     }
 
 
@@ -401,15 +417,11 @@ def compute_composition(df: pd.DataFrame,
         df["_locus_total"]    = df.groupby("locus")["read_count"].transform("sum")
         df["_locus_fraction"] = df["read_count"] / df["_locus_total"]
 
-        # Per-locus "is this locus clonal?" gate.
-        # Two paths qualify a locus as clonal:
-        #   (a) multi-clone with strong dominance — clonality_index ≥ threshold
-        #   (b) single-clone with substantial read support — monoclonal cell-line
-        #       case where N=1 → clonality_index is mathematically NaN, but the
-        #       biology (one clone at 100% of locus reads) is unambiguous
-        # Without (b), monoclonal samples like JURKAT would be misclassified as
-        # "no clonal" because their TRB locus has only one clone.
-        SINGLE_CLONE_READS_MIN = 20  # avoids singleton/duplet noise triggering (b)
+        # Locus is clonal if either:
+        #   (a) clonality_index >= locus_clonality_min, or
+        #   (b) n_clonotypes == 1 AND n_reads >= SINGLE_CLONE_READS_MIN.
+        # (b) covers the monoclonal case where clonality_index is undefined.
+        SINGLE_CLONE_READS_MIN = 20
         locus_clonal_call = {}
         for locus in LOCI:
             cnts = df.loc[df["locus"] == locus, "read_count"].to_numpy()
@@ -527,7 +539,8 @@ def main(argv: list[str] | None = None) -> int:
                          "germline-rearrangement. If omitted, scales automatically "
                          "with --read-length (e.g. 100 nt for 150 bp reads).")
     ap.add_argument("--germline-min-v-identity",   type=float, default=85.0,
-                    help="V identity below which a clone is flagged as germline-rearrangement (default 85.0).")
+                    help="V identity (%%) at or above which a clone counts as "
+                         "near-germline for the artefact filter. Default 85.")
     ap.add_argument("--germline-min-junction-diversity", type=int, default=3,
                     help="Min nt of junction not explained by V Cys + J stem (default 3).")
     ap.add_argument("--out-metrics",      required=True, type=Path)

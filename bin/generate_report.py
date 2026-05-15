@@ -131,11 +131,21 @@ def compute_verdict(metrics: dict, df=None) -> dict:
         )
 
     # ---- Identify any clonal loci ----------------------------------------
+    # A locus is clonal if either:
+    #   (a) clonality_index >= threshold AND top_clone_fraction >= threshold
+    #   (b) n_clonotypes == 1 AND n_reads >= SINGLE_CLONE_READS_MIN
+    # (b) covers the monoclonal case where clonality_index is undefined.
+    SINGLE_CLONE_READS_MIN = 20
     clonal_loci = []
     for L in LOCI:
         m = per_locus.get(L) or {}
-        if (m.get("clonality_index") or 0) >= LOCUS_CLONAL_INDEX_THRESHOLD and \
-           (m.get("top_clone_fraction") or 0) >= TOP_CLONE_FRACTION_THRESHOLD:
+        ci = m.get("clonality_index") or 0
+        top = m.get("top_clone_fraction") or 0
+        n   = m.get("n_clonotypes") or 0
+        reads = m.get("n_reads") or 0
+        multi_clone_clonal  = ci >= LOCUS_CLONAL_INDEX_THRESHOLD and top >= TOP_CLONE_FRACTION_THRESHOLD
+        single_clone_clonal = (n == 1) and (reads >= SINGLE_CLONE_READS_MIN)
+        if multi_clone_clonal or single_clone_clonal:
             clonal_loci.append(L)
     bcr_clonal = [L for L in clonal_loci if L in BCR_LOCI]
     tcr_clonal = [L for L in clonal_loci if L in TCR_LOCI]
@@ -232,6 +242,92 @@ def compute_verdict(metrics: dict, df=None) -> dict:
                      "consistent with polyclonal B/T-cell distribution. "
                      "IGHV mutation status not reportable (no dominant clone)."),
         details=details, warnings=warnings, clonal_loci=[])
+
+
+def interpret(metrics: dict, verdict: dict, df=None) -> str:
+    """Write a plain-English clinical interpretation of the verdict for the
+    report. Output is one short paragraph keyed to the verdict category."""
+    cat = verdict.get("category", "")
+    agg = metrics.get("aggregate") or {}
+    comp = metrics.get("composition") or {}
+    ighv = metrics.get("ighv_status") or {}
+    bcr_clonal = [L for L in verdict.get("clonal_loci", []) if L in BCR_LOCI]
+    tcr_clonal = [L for L in verdict.get("clonal_loci", []) if L in TCR_LOCI]
+
+    if cat == "no_signal":
+        return (
+            "This sample produced no detectable rearranged V(D)J reads. This pattern "
+            "is consistent with germline DNA (non-immune tissue), a sample that did "
+            "not contain lymphocytes, or a capture/library-prep failure that "
+            "prevented IG/TCR enrichment. The sample cannot be assessed for clonality "
+            "and any clonal expansion claim would be unsupported by this assay."
+        )
+
+    if cat == "indeterminate":
+        return (
+            f"Only {agg.get('n_clonotypes',0)} clonotypes were assembled from "
+            f"{comp.get('vdj_assigned_reads',0):,} V(D)J reads — too few to "
+            "confidently distinguish a low-purity tumour from a polyclonal "
+            "background. Deeper sequencing, additional input material, or a "
+            "dedicated repertoire assay is recommended before clinical action."
+        )
+
+    if cat == "no_clonal":
+        return (
+            f"A diverse repertoire of {agg.get('n_clonotypes',0)} clonotypes was "
+            f"detected with the top clone at "
+            f"{(agg.get('top_clone_fraction') or 0)*100:.1f}% — consistent with a "
+            "normal polyclonal B/T-cell distribution (healthy peripheral blood, "
+            "reactive lymphocytosis, or post-treatment immune reconstitution). "
+            "No evidence of clonal lymphoproliferation. IGHV mutation status is "
+            "not reportable as no single dominant clone is present."
+        )
+
+    if cat == "clonal":
+        # Build the lineage description
+        if bcr_clonal and tcr_clonal:
+            lineage = "concurrent B-cell and T-cell clonal expansions"
+        elif bcr_clonal:
+            lineage = f"a B-cell clonal expansion at {'+'.join(bcr_clonal)}"
+        elif tcr_clonal:
+            lineage = f"a T-cell clonal expansion at {'+'.join(tcr_clonal)}"
+        else:
+            lineage = "a clonal expansion"
+
+        # Dominant clone metrics
+        top_pct = (agg.get('top_clone_fraction') or 0) * 100
+        clon = agg.get('clonality_index')
+        clon_str = f"{clon:.2f}" if (clon is not None and not (isinstance(clon, float) and clon != clon)) else "n/a"
+
+        # IGHV addendum if relevant
+        ighv_str = ""
+        if "IGH" in bcr_clonal and ighv and ighv.get("reads_total", 0) > 0:
+            status = ighv.get("dominant_status", "")
+            if status == "unmutated":
+                ighv_str = (" The dominant IGH clone is IGHV-unmutated "
+                            "(≥98% V-identity to germline), which is a "
+                            "poor-prognosis marker in CLL and many B-cell lymphomas.")
+            elif status == "mutated":
+                ighv_str = (" The dominant IGH clone is IGHV-mutated, which is "
+                            "associated with more favourable prognosis in CLL.")
+
+        # Confidence caveat for assembly-inferred dominant clones
+        inf = metrics.get("cdr3_inference") or {}
+        confidence_caveat = ""
+        if inf.get("dominant_clone_spanned") is False:
+            confidence_caveat = (" The dominant CDR3 exceeded the single-read length "
+                                  "and was reconstructed by de novo assembly — "
+                                  "confirmation by deeper or long-read sequencing is "
+                                  "recommended before clinical reporting.")
+
+        return (
+            f"This sample shows {lineage}, with the dominant clone representing "
+            f"{top_pct:.1f}% of V(D)J reads (clonality index {clon_str}). The "
+            "pattern is consistent with a lymphoid neoplasm, monoclonal cell line, "
+            f"or other clonal expansion.{ighv_str}{confidence_caveat}"
+        )
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +633,7 @@ footer .footer-meta .name { color: #ECF0F1; }
 <div class="verdict {{ verdict.severity }}">
   <h2>{{ verdict.headline }}</h2>
   {% if verdict.subheadline %}<div class="sub">{{ verdict.subheadline|safe }}</div>{% endif %}
+  {% if verdict.interpretation %}<p style="margin:10px 0 0; font-size:13px; color:#222; line-height:1.5"><b>Clinical interpretation:</b> {{ verdict.interpretation }}</p>{% endif %}
   {% if verdict.details %}<ul>{% for d in verdict.details %}<li>{{ d|safe }}</li>{% endfor %}</ul>{% endif %}
   {% for w in verdict.warnings %}<div class="warn">{{ w|safe }}</div>{% endfor %}
 </div>
@@ -712,6 +809,7 @@ def main(argv=None):
     ighv      = metrics.get("ighv_status")
 
     verdict = compute_verdict(metrics, df=df)
+    verdict["interpretation"] = interpret(metrics, verdict, df=df)
 
     fig_comp_bar    = fig_composition_bar(comp, args.sample_id) if comp else ""
     fig_comp_donut  = fig_composition_donut(comp, args.sample_id) if comp else ""

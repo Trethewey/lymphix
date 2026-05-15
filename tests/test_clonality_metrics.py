@@ -96,13 +96,14 @@ class TestComposition:
     @pytest.fixture
     def clonal_igh_df(self):
         import pandas as pd
-        # One dominant IGH clone (95% of locus) + small background everywhere
+        # Dominant IGH (2 clones) + singletons at every other locus.
+        # Singleton read counts are below SINGLE_CLONE_READS_MIN (20).
         rows = [
             dict(locus="IGH", read_count=9500, junction="AAA", junction_aa="C"),
             dict(locus="IGH", read_count=500,  junction="GGG", junction_aa="C"),
-            dict(locus="TRB", read_count=200,  junction="TTT", junction_aa="C"),
-            dict(locus="IGK", read_count=100,  junction="CCC", junction_aa="C"),
-            dict(locus="IGL", read_count=80,   junction="AAA", junction_aa="C"),
+            dict(locus="TRB", read_count=5,    junction="TTT", junction_aa="C"),
+            dict(locus="IGK", read_count=4,    junction="CCC", junction_aa="C"),
+            dict(locus="IGL", read_count=3,    junction="AAA", junction_aa="C"),
         ]
         return pd.DataFrame(rows)
 
@@ -110,20 +111,15 @@ class TestComposition:
         out = cm.compute_composition(clonal_igh_df,
                                       total_input_reads=20000,
                                       clonal_threshold=0.05)
-        # IGH has 2 clones with strong dominance (clonality_index > 0.30) → both
-        # clones pass the locus-clonality gate and are pooled as clonal_IGH.
+        # IGH passes the clonality_index gate -> 10,000 clonal_IGH reads.
         assert out["reads"]["clonal_IGH"] == 10000
-        # The lone TRB/IGK/IGL clones each have NaN clonality (N<2), so the
-        # locus-clonality gate fails — they are correctly counted as polyclonal,
-        # not as "clonal_TRB" / "clonal_IGK_kappa" / "clonal_IGL_lambda".
-        # This is exactly the fix that prevents healthy peripheral blood
-        # samples (a handful of 2-read clones each) from being mislabelled clonal.
+        # TRB/IGK/IGL singletons fail both gates -> polyclonal.
         assert out["reads"]["clonal_TRB"] == 0
         assert out["reads"]["clonal_IGK_kappa"] == 0
         assert out["reads"]["clonal_IGL_lambda"] == 0
-        assert out["reads"]["polyclonal_B"] == 100 + 80   # IGK + IGL single clones
-        assert out["reads"]["polyclonal_T"] == 200        # TRB single clone
-        assert out["reads"]["background"] == 20000 - (10000 + 200 + 100 + 80)
+        assert out["reads"]["polyclonal_B"] == 4 + 3
+        assert out["reads"]["polyclonal_T"] == 5
+        assert out["reads"]["background"] == 20000 - (10000 + 5 + 4 + 3)
         assert sum(out["fractions"].values()) == pytest.approx(1.0, abs=1e-6)
 
     def test_background_when_total_unknown(self, clonal_igh_df):

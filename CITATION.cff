@@ -70,3 +70,49 @@ references:
         given-names: "Thomas L."
       - family-names: Ostell
         given-names: "Jim M."
+  - type: article
+    title: "Ig V gene mutation status and CD38 expression as novel prognostic indicators in chronic lymphocytic leukemia"
+    year: 1999
+    journal: Blood
+    volume: 94
+    issue: 6
+    start: 1840
+    end: 1847
+    doi: 10.1182/blood.V94.6.1840
+    authors:
+      - family-names: Damle
+        given-names: "Rajendra N."
+  - type: article
+    title: "Unmutated Ig V(H) genes are associated with a more aggressive form of chronic lymphocytic leukemia"
+    year: 1999
+    journal: Blood
+    volume: 94
+    issue: 6
+    start: 1848
+    end: 1854
+    doi: 10.1182/blood.V94.6.1848
+    authors:
+      - family-names: Hamblin
+        given-names: "Terry J."
+  - type: article
+    title: "iwCLL guidelines for diagnosis, indications for treatment, response assessment, and supportive management of CLL"
+    year: 2018
+    journal: Blood
+    volume: 131
+    issue: 25
+    start: 2745
+    end: 2760
+    doi: 10.1182/blood-2017-09-806398
+    authors:
+      - family-names: Hallek
+        given-names: Michael
+  - type: article
+    title: "AIRR Community Standardized Representations for Annotated Immune Repertoires"
+    year: 2018
+    journal: Frontiers in Immunology
+    volume: 9
+    start: 2206
+    doi: 10.3389/fimmu.2018.02206
+    authors:
+      - family-names: "Vander Heiden"
+        given-names: "Jason A."

@@ -140,6 +140,38 @@ make test-unit      # pytest math tests
 make test-smoke     # mock-AIRR → clonality_metrics → report
 ```
 
+## Validation cohort
+
+Eleven samples with known biology — nine hematological cell lines plus a
+no-signal and a polyclonal control. Expected outcomes are encoded in
+[`tests/validation_expected.json`](tests/validation_expected.json) with
+Cellosaurus IDs and original references.
+
+| Sample | Cellosaurus | Disease | Expected verdict |
+|---|---|---|---|
+| JURKAT       | CVCL_0065 | T-ALL                       | clonal (TRA + TRB) |
+| MOLT-4       | CVCL_0013 | T-ALL                       | clonal (TRB) |
+| KARPAS-299   | CVCL_1324 | ALK+ ALCL                   | clonal (TRB / TRA) |
+| NAMALWA      | CVCL_0067 | Burkitt lymphoma            | clonal (IGH) |
+| DAUDI        | CVCL_0008 | Burkitt lymphoma            | clonal (IGH, mutated IGHV) |
+| RAJI         | CVCL_0511 | Burkitt lymphoma            | clonal (IGH, mutated IGHV) |
+| OCI-LY1      | CVCL_1879 | DLBCL                       | clonal (IGH) |
+| U-266        | CVCL_0566 | Multiple myeloma            | clonal (IGH) |
+| MM.1S        | CVCL_8792 | Multiple myeloma            | clonal (IGH) |
+| PBMC_HEALTHY | —         | Healthy donor, 3' scRNA-seq | no_signal (chemistry-correct) |
+| POLYCLONAL_SIM | —       | Synthetic polyclonal        | no_clonal |
+
+Run end-to-end (downloads ~25 GB from ENA, ~1 h):
+
+```bash
+tests/run_validation_cohort.sh [DATA_DIR]
+```
+
+The current cohort overview is published at
+[`examples/cohort_overview.html`](examples/cohort_overview.html) (open in
+a browser): verdict table, lineage-composition stacked bar, and per-locus
+clonality-index heatmap, all on one page.
+
 ## Panel BED
 
 `regions/clonality_BCR_TCR.bed` (hg38, `chr` prefix) and
@@ -164,6 +196,20 @@ Please cite TRUST4 and IgBLAST when publishing results.
 > Nucleic Acids Research 41(W1), W34–W40 (2013).
 > [doi:10.1093/nar/gkt382](https://doi.org/10.1093/nar/gkt382)
 > · [ncbi.nlm.nih.gov/igblast](https://www.ncbi.nlm.nih.gov/igblast/)
+
+### Clinical interpretation
+
+**IGHV mutation status** — the 98% V-identity cutoff for mutated vs unmutated
+CLL is taken from the original prognostic studies and the iwCLL guidelines.
+> Damle RN *et al.* *Ig V gene mutation status and CD38 expression as novel prognostic indicators in chronic lymphocytic leukemia.* Blood 94, 1840–1847 (1999). [doi:10.1182/blood.V94.6.1840](https://doi.org/10.1182/blood.V94.6.1840)
+>
+> Hamblin TJ *et al.* *Unmutated Ig V(H) genes are associated with a more aggressive form of chronic lymphocytic leukemia.* Blood 94, 1848–1854 (1999). [doi:10.1182/blood.V94.6.1848](https://doi.org/10.1182/blood.V94.6.1848)
+>
+> Hallek M *et al.* *iwCLL guidelines for diagnosis, indications for treatment, response assessment, and supportive management of CLL.* Blood 131, 2745–2760 (2018). [doi:10.1182/blood-2017-09-806398](https://doi.org/10.1182/blood-2017-09-806398)
+
+**AIRR-C clonotype schema** — clonotype tables follow the Adaptive Immune
+Receptor Repertoire Community (AIRR-C) v1.4 Rearrangement schema.
+> Vander Heiden JA *et al.* *AIRR Community Standardized Representations for Annotated Immune Repertoires.* Frontiers in Immunology 9, 2206 (2018). [doi:10.3389/fimmu.2018.02206](https://doi.org/10.3389/fimmu.2018.02206)
 
 ### Supporting tools
 
