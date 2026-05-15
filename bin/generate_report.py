@@ -67,20 +67,70 @@ COMP_ORDER = list(COMP_LABELS.keys())
 # Clonal thresholds used to derive the headline verdict
 LOCUS_CLONAL_INDEX_THRESHOLD = 0.30
 TOP_CLONE_FRACTION_THRESHOLD = 0.20
-LOW_VDJ_YIELD_FRACTION       = 0.005
+LOW_VDJ_YIELD_FRACTION       = 0.005     # fraction of total reads — flag if below
+LOW_VDJ_YIELD_ABSOLUTE       = 200       # absolute V(D)J read count — flag if below
+NO_VDJ_SIGNAL_ABSOLUTE       = 0         # 0 V(D)J reads → no_signal verdict
 
 
 # ---------------------------------------------------------------------------
 # Verdict logic
 # ---------------------------------------------------------------------------
-def compute_verdict(metrics: dict) -> dict:
-    """Return {'headline': str, 'severity': 'positive'|'negative'|'uncertain',
-              'details': list[str], 'warnings': list[str]}."""
+def _str(v) -> str:
+    """Safe str() — tolerates NaN / float / None and returns '' for those."""
+    if v is None or (isinstance(v, float) and v != v):  # NaN check
+        return ""
+    return str(v)
+
+
+def _dominant_clone_id(per_locus_clones: list[dict]) -> str:
+    """Pick the dominant clone across the listed records and return a compact
+    'IGHV2-5*02 / IGHJ6*04 / CDR3 CAHSY...' string. Returns '' if no clone."""
+    if not per_locus_clones:
+        return ""
+    top = max(per_locus_clones, key=lambda r: r.get("read_count") or 0)
+    v = _str(top.get("v_call")).split(",")[0]
+    j = _str(top.get("j_call")).split(",")[0]
+    cdr3 = _str(top.get("junction_aa")) or "—"
+    pct = (top.get("locus_fraction") or 0) * 100
+    reads = int(top.get("read_count") or 0)
+    parts = []
+    if v: parts.append(v)
+    if j: parts.append(j)
+    parts.append(f"CDR3 <code>{cdr3}</code>")
+    return f"{' / '.join(parts)}. Top clone {pct:.1f}% of locus ({reads:,} reads)."
+
+
+def compute_verdict(metrics: dict, df=None) -> dict:
+    """Clinically explicit verdict. Possible categories:
+        clonal         — a real dominant rearrangement
+        no_clonal      — diverse repertoire, no dominance (healthy / reactive)
+        no_signal      — zero V(D)J reads (germline / non-immune / failed)
+        indeterminate  — V(D)J reads present but yield too low to call
+    """
     per_locus = metrics.get("per_locus") or {}
     comp      = metrics.get("composition") or {}
     ighv      = metrics.get("ighv_status") or {}
-    fractions = comp.get("fractions", {})
 
+    vdj_reads = (comp or {}).get("vdj_assigned_reads", 0) or 0
+    total_n_clonotypes = (metrics.get("aggregate") or {}).get("n_clonotypes", 0) or 0
+
+    details, warnings = [], []
+
+    # ---- Category: no V(D)J signal ---------------------------------------
+    if vdj_reads <= NO_VDJ_SIGNAL_ABSOLUTE or total_n_clonotypes == 0:
+        return dict(
+            category="no_signal",
+            severity="neutral",
+            headline="No V(D)J signal detected",
+            subheadline=("This sample contains no detectable rearranged BCR/TCR reads. "
+                         "Compatible with germline DNA, non-immune tissue, or capture failure. "
+                         "<b>Clonality cannot be assessed.</b>"),
+            details=details,
+            warnings=warnings,
+            clonal_loci=[],
+        )
+
+    # ---- Identify any clonal loci ----------------------------------------
     clonal_loci = []
     for L in LOCI:
         m = per_locus.get(L) or {}
@@ -90,49 +140,98 @@ def compute_verdict(metrics: dict) -> dict:
     bcr_clonal = [L for L in clonal_loci if L in BCR_LOCI]
     tcr_clonal = [L for L in clonal_loci if L in TCR_LOCI]
 
-    details, warnings = [], []
-    severity = "negative"
-    if bcr_clonal and tcr_clonal:
-        headline = f"Bi-clonal — B-cell ({'+'.join(bcr_clonal)}) and T-cell ({'+'.join(tcr_clonal)})"
-        severity = "positive"
-    elif bcr_clonal:
-        headline = f"Clonal B-cell — {'+'.join(bcr_clonal)} dominant"
-        severity = "positive"
-    elif tcr_clonal:
-        headline = f"Clonal T-cell — {'+'.join(tcr_clonal)} dominant"
-        severity = "positive"
-    else:
-        headline = "Polyclonal repertoire — no dominant clone detected"
+    # ---- Low-yield warning (applies to any verdict) ----------------------
+    if vdj_reads < LOW_VDJ_YIELD_ABSOLUTE:
+        warnings.append(f"<b>Low V(D)J yield ({vdj_reads:,} reads).</b> "
+                        "Confidence is reduced; consider deeper sequencing or repeat assay "
+                        "before clinical action.")
 
-    # Light-chain restriction supporting flag
+    # ---- Long-CDR3 / assembly-inferred warning ---------------------------
+    # If the dominant clone's CDR3 could not be spanned by a single read, the
+    # junction was reconstructed by assembly across overlapping reads. Note
+    # this in the verdict so clinicians know to weigh the call accordingly.
+    inf = metrics.get("cdr3_inference") or {}
+    if inf.get("dominant_clone_spanned") is False:
+        rl = inf.get("read_length", 150)
+        warnings.append(
+            f"<b>Dominant clone's CDR3 not spanned by a single {rl} bp read</b> "
+            "— junction was reconstructed by de novo assembly across overlapping "
+            "reads. Single-read confirmation, deeper coverage, or long-read "
+            "sequencing recommended before clinical action."
+        )
+    if comp:
+        vdj_frac = vdj_reads / max(1, comp.get("total_input_reads", 1))
+        if vdj_frac < LOW_VDJ_YIELD_FRACTION:
+            warnings.append(f"V(D)J reads are only {100*vdj_frac:.3f}% of total input — "
+                            "panel may have limited IG/TCR coverage or capture may have under-performed.")
+
+    # ---- Build clone-identity strings for the headline -------------------
+    def _clones_for_loci(loci):
+        if df is None or df.empty:
+            return []
+        sub = df[df["locus"].isin(loci)]
+        return sub.to_dict("records") if not sub.empty else []
+
+    bcr_clone_str = _dominant_clone_id(_clones_for_loci(bcr_clonal)) if bcr_clonal else ""
+    tcr_clone_str = _dominant_clone_id(_clones_for_loci(tcr_clonal)) if tcr_clonal else ""
+
+    # ---- Light-chain restriction (supporting evidence) -------------------
     kl_call = comp.get("kappa_lambda_call")
     klr     = comp.get("kappa_lambda_ratio")
-    if kl_call and kl_call not in ("balanced", "no_lambda_reads"):
+    if kl_call and kl_call not in ("balanced", "no_lambda_reads") and bcr_clonal:
         details.append(f"Light-chain restriction: <b>{kl_call.replace('_',' ')}</b> "
-                       f"(κ:λ = {klr:.2f}; normal range 0.5–2.5)")
-        if severity == "negative":
-            severity = "uncertain"
+                       f"(κ:λ = {klr:.2f}; normal range 0.5–2.5).")
 
-    # IGHV mutation status (if IGH present)
-    if ighv and ighv.get("reads_total", 0) > 0:
-        details.append(f"IGHV mutation status (CLL prognostic): "
-                       f"<b>{ighv['dominant_status']}</b> "
-                       f"({100*ighv['fraction_unmutated']:.1f}% unmutated)")
+    # ---- IGHV mutation status — ONLY when there is a dominant IGH clone --
+    if "IGH" in bcr_clonal and ighv and ighv.get("reads_total", 0) > 0:
+        details.append(f"IGHV mutation status: <b>{ighv['dominant_status']}</b> "
+                       f"({100*ighv['fraction_unmutated']:.0f}% unmutated). "
+                       "Unmutated IGHV (≥98% V-identity) is a poor-prognosis marker in CLL/B-NHL.")
 
-    # Warnings
-    if comp:
-        vdj_frac = comp.get("vdj_assigned_reads", 0) / max(1, comp.get("total_input_reads", 1))
-        if vdj_frac < LOW_VDJ_YIELD_FRACTION:
-            warnings.append(f"Low V(D)J yield: only {100*vdj_frac:.2f}% of input reads "
-                            "assembled into clonotypes. Interpret cautiously — possible "
-                            "capture failure or non-immune sample.")
-        if not comp.get("total_input_reads_known"):
-            warnings.append("Total input read count was not supplied — background fraction is "
-                            "treated as 0. Pass --total-input-reads to make composition accurate.")
+    # ---- Verdict category + headline -------------------------------------
+    if bcr_clonal and tcr_clonal:
+        headline = "Bi-clonal expansion — B-cell + T-cell"
+        sub_parts = []
+        if bcr_clone_str: sub_parts.append(f"<b>BCR:</b> {bcr_clone_str}")
+        if tcr_clone_str: sub_parts.append(f"<b>TCR:</b> {tcr_clone_str}")
+        subheadline = "<br>".join(sub_parts) or ""
+        return dict(category="clonal", severity="positive",
+                    headline=headline, subheadline=subheadline,
+                    details=details, warnings=warnings, clonal_loci=clonal_loci)
 
-    return dict(headline=headline, severity=severity,
-                details=details, warnings=warnings,
-                clonal_loci=clonal_loci)
+    if bcr_clonal:
+        return dict(
+            category="clonal", severity="positive",
+            headline=f"Clonal B-cell expansion — {'/'.join(bcr_clonal)}",
+            subheadline=bcr_clone_str,
+            details=details, warnings=warnings, clonal_loci=clonal_loci)
+
+    if tcr_clonal:
+        return dict(
+            category="clonal", severity="positive",
+            headline=f"Clonal T-cell expansion — {'/'.join(tcr_clonal)}",
+            subheadline=tcr_clone_str,
+            details=details, warnings=warnings, clonal_loci=clonal_loci)
+
+    # ---- No clonal expansion --------------------------------------------
+    # Distinguish "polyclonal" from "indeterminate / too few clones"
+    if total_n_clonotypes < 5:
+        return dict(
+            category="indeterminate", severity="uncertain",
+            headline="Indeterminate — insufficient V(D)J yield to assess clonality",
+            subheadline=(f"Only {total_n_clonotypes} clonotypes detected from "
+                         f"{vdj_reads:,} V(D)J reads. Sample is uninformative for clonality. "
+                         "Repeat sequencing or alternative assay recommended."),
+            details=details, warnings=warnings, clonal_loci=[])
+
+    return dict(
+        category="no_clonal", severity="negative",
+        headline="No clonal expansion detected",
+        subheadline=(f"Diverse repertoire of {total_n_clonotypes} clonotypes, top clone "
+                     f"{(metrics['aggregate'].get('top_clone_fraction') or 0)*100:.1f}% — "
+                     "consistent with polyclonal B/T-cell distribution. "
+                     "IGHV mutation status not reportable (no dominant clone)."),
+        details=details, warnings=warnings, clonal_loci=[])
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +445,7 @@ TEMPLATE = """
 <html><head>
 <meta charset="utf-8">
 <title>BCR/TCR Clonality — {{ sample_id }}</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{{ plotly_js|safe }}
 <style>
 :root { --bcr:#1B4F72; --tcr:#922B21; --pos:#c0392b; --neg:#27ae60; --warn:#e67e22; --muted:#666; }
 body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1200px;
@@ -369,13 +468,18 @@ header .meta { color: #BDC3C7; font-size: 12px; line-height: 1.6; }
 header .logo text[fill="#2C3E50"] { fill: #FFFFFF; }
 header .logo text[fill="#7F8C8D"] { fill: #BDC3C7; }
 header .logo line[stroke="#2C3E50"] { stroke: #FFFFFF; }
-.verdict { margin: 16px 28px; padding: 14px 18px; border-radius: 6px;
+.verdict { margin: 16px 28px; padding: 16px 20px; border-radius: 6px;
            border-left: 5px solid var(--neg); background: #f4faf6; }
 .verdict.positive  { border-color: var(--pos); background: #fdf3f1; }
 .verdict.uncertain { border-color: var(--warn); background: #fdf6ec; }
-.verdict h2 { margin: 0; font-size: 18px; }
-.verdict ul { margin: 8px 0 0 18px; padding: 0; font-size: 13px; color: #333; }
-.verdict .warn { color: var(--warn); font-size: 12px; margin-top: 6px; }
+.verdict.neutral   { border-color: #95a5a6; background: #f4f6f7; }
+.verdict h2 { margin: 0 0 4px; font-size: 18px; }
+.verdict .sub { font-size: 13px; color: #333; margin: 4px 0 0; }
+.verdict ul { margin: 10px 0 0 18px; padding: 0; font-size: 12px; color: #444; }
+.verdict ul li { margin-bottom: 3px; }
+.verdict .warn { color: var(--warn); font-size: 12px; margin-top: 8px;
+                  padding: 4px 8px; background: rgba(230,126,34,0.07);
+                  border-left: 3px solid var(--warn); border-radius: 3px; }
 section { padding: 16px 28px 24px; border-top: 1px solid #ddd; }
 section h2 { font-size: 18px; border-left: 4px solid #4a7; padding-left: 10px; margin: 0 0 8px; }
 section p.intro { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
@@ -432,8 +536,9 @@ footer .footer-meta .name { color: #ECF0F1; }
 
 <div class="verdict {{ verdict.severity }}">
   <h2>{{ verdict.headline }}</h2>
+  {% if verdict.subheadline %}<div class="sub">{{ verdict.subheadline|safe }}</div>{% endif %}
   {% if verdict.details %}<ul>{% for d in verdict.details %}<li>{{ d|safe }}</li>{% endfor %}</ul>{% endif %}
-  {% for w in verdict.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+  {% for w in verdict.warnings %}<div class="warn">{{ w|safe }}</div>{% endfor %}
 </div>
 
 <section id="summary">
@@ -606,7 +711,7 @@ def main(argv=None):
     per_locus = metrics.get("per_locus") or {}
     ighv      = metrics.get("ighv_status")
 
-    verdict = compute_verdict(metrics)
+    verdict = compute_verdict(metrics, df=df)
 
     fig_comp_bar    = fig_composition_bar(comp, args.sample_id) if comp else ""
     fig_comp_donut  = fig_composition_donut(comp, args.sample_id) if comp else ""
@@ -634,8 +739,14 @@ def main(argv=None):
         ("D50",                _fmt(agg.get("D50"))),
     ]
 
+    # Inline the full Plotly.js bundle once so the report works offline
+    # (CDNs like cdn.plot.ly are blocked behind many corporate / NHS firewalls).
+    from plotly.offline import get_plotlyjs
+    plotly_js_inline = f'<script type="text/javascript">{get_plotlyjs()}</script>'
+
     html = Template(TEMPLATE).render(
         sample_id       = args.sample_id,
+        plotly_js       = plotly_js_inline,
         logo_svg        = _load_logo_svg(),
         generated_on    = datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         min_clone_count = metrics.get("min_clone_count", 2),

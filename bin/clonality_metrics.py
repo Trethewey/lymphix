@@ -259,6 +259,48 @@ def build_clonotype_table(trust4: pd.DataFrame, igblast: pd.DataFrame) -> pd.Dat
     return df.reset_index(drop=True)
 
 
+# ---------------------------------------------------------------------------
+# Read-length awareness — Phase 1 of the long-CDR3 confidence framework
+# ---------------------------------------------------------------------------
+# A clone's CDR3 is "spanned by a single read" if the read length can cover
+# the junction plus a minimal V- and J-anchor on either side. Anchor padding
+# is the number of nt required to confidently identify the V and J segments;
+# 15 nt each is a common threshold.
+SINGLE_READ_SPAN_ANCHOR_NT = 15
+
+
+def annotate_single_read_spanning(df: pd.DataFrame, read_length: int) -> pd.DataFrame:
+    """Add `cdr3_spanned_by_single_read` and `assembly_inferred` columns.
+
+    `cdr3_spanned_by_single_read = True` when read_length is large enough to
+    cover the entire junction plus V- and J-anchors → the CDR3 was directly
+    observed on at least one read (high-confidence by construction).
+    `assembly_inferred = True` is the inverse — the CDR3 was reconstructed by
+    TRUST4's overlap-based assembly across multiple reads and should be flagged
+    for further confidence assessment downstream (see bin/infer_long_cdr3.py).
+    """
+    if df.empty:
+        return df
+    df = df.copy()
+    junc_len = df["junction"].fillna("").str.len()
+    span_needed = junc_len + 2 * SINGLE_READ_SPAN_ANCHOR_NT
+    df["cdr3_spanned_by_single_read"] = span_needed <= read_length
+    df["assembly_inferred"]           = ~df["cdr3_spanned_by_single_read"]
+    return df
+
+
+def adaptive_min_v_match(read_length: int) -> int:
+    """V CIGAR match threshold for the germline-rearrangement filter scales
+    with read length so the filter doesn't over-reject short-read data.
+
+      75 bp reads  → ~49 nt min V match
+     150 bp reads  → ~98 nt    (close to the original 100 default)
+     250 bp reads  → ~163 nt
+    1000 bp reads  → 200 nt    (capped)
+    """
+    return int(max(20, min(200, round(read_length * 0.65))))
+
+
 def apply_germline_rearrangement_filter(df: pd.DataFrame, *,
                                          min_v_match: int = 100,
                                          min_v_identity: float = 85.0,
@@ -320,7 +362,9 @@ def assign_ighv_mutation_status(df: pd.DataFrame, cutoff: float) -> pd.DataFrame
 # ---------------------------------------------------------------------------
 def compute_composition(df: pd.DataFrame,
                         total_input_reads: int | None,
-                        clonal_threshold: float) -> dict:
+                        clonal_threshold: float,
+                        denominator: str = "total",
+                        locus_clonality_min: float = 0.30) -> dict:
     """
     Partition total input reads into eight mutually-exclusive pools:
         clonal_IGH, clonal_IGK_kappa, clonal_IGL_lambda, polyclonal_B,
@@ -351,10 +395,26 @@ def compute_composition(df: pd.DataFrame,
         df = df.copy()
         df["_locus_total"]    = df.groupby("locus")["read_count"].transform("sum")
         df["_locus_fraction"] = df["read_count"] / df["_locus_total"]
+
+        # Per-locus aggregate clonality index — used to gate the "clonal" call.
+        # A clone counts as "clonal" only if (a) it dominates its locus by
+        # clonal_threshold AND (b) the locus itself is non-polyclonal
+        # (clonality_index >= locus_clonality_min). Without (b), a low-count
+        # locus where 8 clones each have 2 reads would mislabel every clone
+        # as "clonal" purely because 1/8 ≥ clonal_threshold.
+        locus_clonal_call = {}
+        for locus in LOCI:
+            cnts = df.loc[df["locus"] == locus, "read_count"].to_numpy()
+            ci = clonality_index(cnts)
+            locus_clonal_call[locus] = (ci is not None
+                                        and not (isinstance(ci, float) and ci != ci)
+                                        and ci >= locus_clonality_min)
+
         for _, r in df.iterrows():
             locus  = r["locus"]
             reads  = int(r["read_count"])
-            is_clonal = (r["_locus_fraction"] >= clonal_threshold)
+            is_clonal = (r["_locus_fraction"] >= clonal_threshold
+                          and locus_clonal_call.get(locus, False))
             if locus == "IGH":
                 pools["clonal_IGH" if is_clonal else "polyclonal_B"] += reads
             elif locus == "IGK":
@@ -369,8 +429,20 @@ def compute_composition(df: pd.DataFrame,
                 pools["polyclonal_T"] += reads  # TRA rarely diagnostic on its own
 
     denom_known = total_input_reads is not None and total_input_reads > 0
-    denom = int(total_input_reads) if denom_known else vdj_reads
-    pools["background"] = max(0, denom - vdj_reads)
+
+    # Two denominator modes:
+    #   "total" — fractions are % of total input reads. Useful for repertoire
+    #             panels where V(D)J reads dominate; on cancer-gene panels
+    #             (e.g. CAPP-seq) it makes the background pool ~99% and the
+    #             clonal pools disappear visually.
+    #   "vdj"   — fractions are % of V(D)J-assigned reads only. Drops the
+    #             background pool. Use when IG is a small panel target.
+    if denominator == "vdj":
+        denom = vdj_reads
+        pools["background"] = 0
+    else:
+        denom = int(total_input_reads) if denom_known else vdj_reads
+        pools["background"] = max(0, denom - vdj_reads)
 
     fractions = {k: (v / denom if denom else 0.0) for k, v in pools.items()}
 
@@ -392,8 +464,10 @@ def compute_composition(df: pd.DataFrame,
 
     return {
         "total_input_reads_known":   denom_known,
-        "total_input_reads":         denom,
+        "total_input_reads":         int(total_input_reads) if denom_known else vdj_reads,
         "vdj_assigned_reads":        vdj_reads,
+        "denominator_mode":          denominator,
+        "denominator_value":         denom,
         "clonal_dominance_threshold": clonal_threshold,
         "reads":                      pools,
         "fractions":                  fractions,
@@ -420,6 +494,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--total-input-reads", type=int, default=None,
                     help="Total reads in the input FASTQ/BAM (denominator for background fraction). "
                          "If omitted, background defaults to 0.")
+    ap.add_argument("--composition-denominator", choices=["total", "vdj"], default="total",
+                    help="Composition fraction denominator: 'total' (default — %% of total input "
+                         "reads, suitable for repertoire panels) or 'vdj' (%% of V(D)J-assigned "
+                         "reads only, suitable for cancer-gene panels where IG is a small target).")
     ap.add_argument("--filter-germline-rearrangements",
                     dest="filter_germline_rearrangements",
                     action="store_true", default=True,
@@ -430,10 +508,16 @@ def main(argv: list[str] | None = None) -> int:
                     dest="filter_germline_rearrangements",
                     action="store_false",
                     help="Disable the germline-rearrangement filter (keep raw TRUST4 output).")
-    ap.add_argument("--germline-min-v-match",      type=int,   default=100,
-                    help="V CIGAR match length below which a clone is flagged as germline-rearrangement (default 100).")
+    ap.add_argument("--read-length", type=int, default=150,
+                    help="Sequencing read length (nt). Used to (a) compute the "
+                         "cdr3_spanned_by_single_read flag and (b) auto-scale the "
+                         "germline-filter V-match threshold. Default 150.")
+    ap.add_argument("--germline-min-v-match",      type=int,   default=None,
+                    help="V CIGAR match length below which a clone is flagged as "
+                         "germline-rearrangement. If omitted, scales automatically "
+                         "with --read-length (e.g. 100 nt for 150 bp reads).")
     ap.add_argument("--germline-min-v-identity",   type=float, default=85.0,
-                    help="V identity %% below which a clone is flagged as germline-rearrangement (default 85.0).")
+                    help="V identity below which a clone is flagged as germline-rearrangement (default 85.0).")
     ap.add_argument("--germline-min-junction-diversity", type=int, default=3,
                     help="Min nt of junction not explained by V Cys + J stem (default 3).")
     ap.add_argument("--out-metrics",      required=True, type=Path)
@@ -449,14 +533,24 @@ def main(argv: list[str] | None = None) -> int:
     # Apply min-count filter
     df = df[df["read_count"] >= args.min_clone_count].copy()
 
+    # Resolve adaptive V-match threshold
+    min_v_match = args.germline_min_v_match
+    if min_v_match is None:
+        min_v_match = adaptive_min_v_match(args.read_length)
+
     # Germline-rearrangement filter
     germline_filter_stats = None
     if args.filter_germline_rearrangements:
         df, germline_filter_stats = apply_germline_rearrangement_filter(
             df,
-            min_v_match=args.germline_min_v_match,
+            min_v_match=min_v_match,
             min_v_identity=args.germline_min_v_identity,
             min_junction_diversity=args.germline_min_junction_diversity)
+        germline_filter_stats["thresholds"]["min_v_match_adaptive"] = (args.germline_min_v_match is None)
+
+    # Read-length-aware annotation: which CDR3s were directly observed on a
+    # single read, vs reconstructed by assembly
+    df = annotate_single_read_spanning(df, args.read_length)
 
     df = assign_ighv_mutation_status(df, args.igh_mutated_cutoff)
 
@@ -491,12 +585,29 @@ def main(argv: list[str] | None = None) -> int:
         ighv_summary = None
 
     composition = compute_composition(df, args.total_input_reads,
-                                       args.clonal_dominance_threshold)
+                                       args.clonal_dominance_threshold,
+                                       denominator=args.composition_denominator)
+
+    # Long-CDR3 / assembly-inferred summary
+    if df.empty:
+        cdr3_inference = {"n_clonotypes": 0, "n_single_read_spanned": 0, "n_assembly_inferred": 0}
+    else:
+        cdr3_inference = {
+            "read_length":              args.read_length,
+            "anchor_required_nt":       SINGLE_READ_SPAN_ANCHOR_NT,
+            "n_clonotypes":             int(len(df)),
+            "n_single_read_spanned":    int(df["cdr3_spanned_by_single_read"].sum()),
+            "n_assembly_inferred":      int(df["assembly_inferred"].sum()),
+            "dominant_clone_spanned":   bool(df.sort_values("read_count", ascending=False)
+                                              .iloc[0]["cdr3_spanned_by_single_read"]) if len(df) else None,
+        }
 
     metrics = {
         "sample_id":      args.sample_id,
         "min_clone_count": args.min_clone_count,
+        "read_length":    args.read_length,
         "germline_rearrangement_filter": germline_filter_stats,
+        "cdr3_inference": cdr3_inference,
         "per_locus":      per_locus,
         "aggregate":      aggregate,
         "ighv_status":    ighv_summary,
