@@ -173,13 +173,16 @@ def find_logo() -> str:
         return ""
 
 
-def render(samples: dict[str, dict], out: Path) -> None:
+def render(samples: dict[str, dict], out: Path, plotly_mode: str = "inline") -> None:
     n_pass = sum(1 for s in samples.values() if s.get("pass"))
     n_total = len(samples)
     table_html = build_table(samples).to_html(include_plotlyjs=False, full_html=False, div_id="tbl")
     comp_html  = build_composition(samples).to_html(include_plotlyjs=False, full_html=False, div_id="comp")
     heat_html  = build_clonality_heatmap(samples).to_html(include_plotlyjs=False, full_html=False, div_id="heat")
-    plotly_js = get_plotlyjs()
+    if plotly_mode == "cdn":
+        plotly_block = '<script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>'
+    else:
+        plotly_block = f"<script>{get_plotlyjs()}</script>"
     logo_svg  = find_logo()
     stamp     = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     status_cls = "pass" if n_pass == n_total else "fail"
@@ -222,7 +225,7 @@ def render(samples: dict[str, dict], out: Path) -> None:
   footer {{ margin-top: 24px; color: var(--ink-soft); font-size: 12px;
             text-align: right; }}
 </style>
-<script>{plotly_js}</script>
+{plotly_block}
 </head><body>
 
 <header>
@@ -256,6 +259,9 @@ def main():
     ap.add_argument("--grading", type=Path,
                     help="Optional _validation_grading.json from grade_validation.py.")
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--plotly", choices=["inline", "cdn"], default="inline",
+                    help="Embed Plotly.js (~4.8 MB, offline-safe) or load from "
+                         "CDN (~50 KB file, needs internet). Default: inline.")
     args = ap.parse_args()
 
     spec = json.loads(args.expected.read_text())
@@ -278,7 +284,7 @@ def main():
         }
     if not samples:
         raise SystemExit("No sample results found.")
-    render(samples, args.out)
+    render(samples, args.out, plotly_mode=args.plotly)
 
 
 if __name__ == "__main__":

@@ -167,21 +167,21 @@ Run end-to-end (downloads ~25 GB from ENA, ~1 h):
 tests/run_validation_cohort.sh [DATA_DIR]
 ```
 
-The current cohort overview is at
-[`examples/cohort_overview.html`](examples/cohort_overview.html) — verdict
-table, lineage-composition stacked bar, and per-locus clonality-index
-heatmap on one self-contained page.
+Verdict table, lineage-composition stacked bar, and per-locus
+clonality-index heatmap on one self-contained page. Two builds:
 
-GitHub serves `.html` as source, not rendered. To view in a browser:
+| File | Size | Use |
+|---|---|---|
+| [`examples/cohort_overview.html`](examples/cohort_overview.html)         | 4.9 MB | inline Plotly, offline-safe (firewalled clinical networks) |
+| [`examples/cohort_overview_cdn.html`](examples/cohort_overview_cdn.html) |  40 KB | loads Plotly from CDN, needs internet |
 
-- **Hosted preview** (once Pages is enabled on this repo):
-  [trethewey.github.io/lymphix/](https://trethewey.github.io/lymphix/)
-- **Locally:** clone the repo, or download the file via
-  *Raw → Save as → open*.
+**View rendered in your browser** (uses the CDN build):
+[htmlpreview.github.io / cohort_overview_cdn.html](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/cohort_overview_cdn.html)
 
-To enable Pages: repo *Settings → Pages → Source: deploy from branch
-`main`, folder `/`*. After ~1 minute the landing page and cohort overview
-are served from the URL above.
+For a permanent URL on this repo, enable
+[GitHub Pages](https://github.com/Trethewey/lymphix/settings/pages)
+(source: `main`, folder `/`) — the landing page then lives at
+[trethewey.github.io/lymphix/](https://trethewey.github.io/lymphix/).
 
 ## Panel BED
 
