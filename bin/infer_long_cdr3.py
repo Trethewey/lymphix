@@ -226,9 +226,18 @@ def main(argv=None):
     df = pd.read_csv(args.clonotypes, sep="\t", dtype=str)
     if df.empty:
         args.out_tsv.write_text("sample_id\tn_clonotypes\tnotes\n")
-        args.out_json.write_text(json.dumps({"sample_id": args.sample_id,
-                                              "n_clonotypes": 0,
-                                              "mode": args.mode}, indent=2))
+        args.out_json.write_text(json.dumps({
+            "sample_id":          args.sample_id,
+            "mode":               args.mode,
+            "read_length":        args.read_length,
+            "n_clonotypes":       0,
+            "n_assembly_inferred":0,
+            "band_counts":        {},
+            "dominant_clone":     None,
+            "weights":            WEIGHTS,
+            "cohort_dir":         str(args.cohort_dir) if args.cohort_dir else None,
+            "n_cohort_samples":   0,
+        }, indent=2))
         print(f"[infer_long_cdr3] no clonotypes for {args.sample_id}")
         return 0
 

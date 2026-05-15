@@ -110,15 +110,19 @@ class TestComposition:
         out = cm.compute_composition(clonal_igh_df,
                                       total_input_reads=20000,
                                       clonal_threshold=0.05)
-        # Both IGH clones meet the >=5% locus-fraction bar (9500/10000=95%, 500/10000=5%)
+        # IGH has 2 clones with strong dominance (clonality_index > 0.30) → both
+        # clones pass the locus-clonality gate and are pooled as clonal_IGH.
         assert out["reads"]["clonal_IGH"] == 10000
-        # The lone TRB clone is 100% of TRB locus, so it's clonal_TRB (not polyclonal)
-        assert out["reads"]["clonal_TRB"] == 200
-        # Lone IGK and IGL clones are also 100% of their loci, so each is clonal-restricted
-        assert out["reads"]["clonal_IGK_kappa"] == 100
-        assert out["reads"]["clonal_IGL_lambda"] == 80
-        assert out["reads"]["polyclonal_B"] == 0
-        assert out["reads"]["polyclonal_T"] == 0
+        # The lone TRB/IGK/IGL clones each have NaN clonality (N<2), so the
+        # locus-clonality gate fails — they are correctly counted as polyclonal,
+        # not as "clonal_TRB" / "clonal_IGK_kappa" / "clonal_IGL_lambda".
+        # This is exactly the fix that prevents healthy peripheral blood
+        # samples (a handful of 2-read clones each) from being mislabelled clonal.
+        assert out["reads"]["clonal_TRB"] == 0
+        assert out["reads"]["clonal_IGK_kappa"] == 0
+        assert out["reads"]["clonal_IGL_lambda"] == 0
+        assert out["reads"]["polyclonal_B"] == 100 + 80   # IGK + IGL single clones
+        assert out["reads"]["polyclonal_T"] == 200        # TRB single clone
         assert out["reads"]["background"] == 20000 - (10000 + 200 + 100 + 80)
         assert sum(out["fractions"].values()) == pytest.approx(1.0, abs=1e-6)
 

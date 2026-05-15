@@ -58,11 +58,16 @@ def make_clonotype(rng, locus, seq_id, read_count, v_identity_pct=None):
     full_seq = v_stub + nt + j_stub
     if v_identity_pct is None:
         v_identity_pct = round(rng.uniform(85.0, 100.0), 2)
+    # Synthesize a realistic-looking V CIGAR so the germline-rearrangement
+    # filter recognises this as a real clone (≥100 nt V alignment).
+    v_cigar = f"0S250M{len(j_stub) + len(nt)}S2N"
+    j_cigar = f"{240 + len(nt)}S50M0S"
     return dict(
         sequence_id=seq_id, sequence=full_seq, rev_comp="F",
         productive="T", vj_in_frame="T", stop_codon="F", complete_vdj="T",
         locus=locus, v_call=v, d_call=d, j_call=j, c_call="",
         junction=nt, junction_aa=aa,
+        v_cigar=v_cigar, d_cigar="", j_cigar=j_cigar,
         consensus_count=read_count, duplicate_count=read_count,
         v_identity=v_identity_pct,
     )
@@ -97,7 +102,8 @@ def generate(mode, rng):
 def write_trust4(records, out):
     cols = ["sequence_id", "sequence", "rev_comp", "productive", "vj_in_frame",
             "stop_codon", "complete_vdj", "locus", "v_call", "d_call", "j_call",
-            "c_call", "junction", "junction_aa", "consensus_count", "duplicate_count"]
+            "c_call", "junction", "junction_aa", "v_cigar", "d_cigar", "j_cigar",
+            "v_identity", "consensus_count", "duplicate_count"]
     pd.DataFrame(records)[cols].to_csv(out, sep="\t", index=False)
 
 
