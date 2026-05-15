@@ -308,7 +308,12 @@ def apply_germline_rearrangement_filter(df: pd.DataFrame, *,
     """Mark + drop clones that look like germline-rearrangement artefacts.
     Returns (filtered_df, summary_stats)."""
     if df.empty:
-        return df, {"n_input": 0, "n_dropped": 0, "n_kept": 0, "by_reason": {}}
+        return df, {"n_input": 0, "n_dropped": 0, "n_kept": 0, "by_reason": {},
+                     "thresholds": {
+                         "min_v_match":            min_v_match,
+                         "min_v_identity":         min_v_identity,
+                         "min_junction_diversity": min_junction_diversity,
+                     }}
 
     flags = df.apply(
         lambda r: is_germline_rearrangement(
@@ -396,19 +401,24 @@ def compute_composition(df: pd.DataFrame,
         df["_locus_total"]    = df.groupby("locus")["read_count"].transform("sum")
         df["_locus_fraction"] = df["read_count"] / df["_locus_total"]
 
-        # Per-locus aggregate clonality index — used to gate the "clonal" call.
-        # A clone counts as "clonal" only if (a) it dominates its locus by
-        # clonal_threshold AND (b) the locus itself is non-polyclonal
-        # (clonality_index >= locus_clonality_min). Without (b), a low-count
-        # locus where 8 clones each have 2 reads would mislabel every clone
-        # as "clonal" purely because 1/8 ≥ clonal_threshold.
+        # Per-locus "is this locus clonal?" gate.
+        # Two paths qualify a locus as clonal:
+        #   (a) multi-clone with strong dominance — clonality_index ≥ threshold
+        #   (b) single-clone with substantial read support — monoclonal cell-line
+        #       case where N=1 → clonality_index is mathematically NaN, but the
+        #       biology (one clone at 100% of locus reads) is unambiguous
+        # Without (b), monoclonal samples like JURKAT would be misclassified as
+        # "no clonal" because their TRB locus has only one clone.
+        SINGLE_CLONE_READS_MIN = 20  # avoids singleton/duplet noise triggering (b)
         locus_clonal_call = {}
         for locus in LOCI:
             cnts = df.loc[df["locus"] == locus, "read_count"].to_numpy()
             ci = clonality_index(cnts)
-            locus_clonal_call[locus] = (ci is not None
-                                        and not (isinstance(ci, float) and ci != ci)
-                                        and ci >= locus_clonality_min)
+            multi_clone_clonal = (ci is not None
+                                  and not (isinstance(ci, float) and ci != ci)
+                                  and ci >= locus_clonality_min)
+            single_clone_clonal = (cnts.size == 1 and int(cnts.sum()) >= SINGLE_CLONE_READS_MIN)
+            locus_clonal_call[locus] = multi_clone_clonal or single_clone_clonal
 
         for _, r in df.iterrows():
             locus  = r["locus"]
@@ -530,8 +540,16 @@ def main(argv: list[str] | None = None) -> int:
 
     df = build_clonotype_table(trust4, igblast)
 
-    # Apply min-count filter
-    df = df[df["read_count"] >= args.min_clone_count].copy()
+    # Apply min-count filter (guard for the empty case — TRUST4 may have
+    # produced no clonotypes at all, e.g. on a 3'-biased library)
+    if not df.empty and "read_count" in df.columns:
+        df = df[df["read_count"] >= args.min_clone_count].copy()
+    else:
+        # Make sure df has the columns downstream code expects
+        for col in ["locus", "read_count", "v_call", "d_call", "j_call",
+                    "junction", "junction_aa", "v_cigar", "v_identity"]:
+            if col not in df.columns:
+                df[col] = pd.Series(dtype=object)
 
     # Resolve adaptive V-match threshold
     min_v_match = args.germline_min_v_match

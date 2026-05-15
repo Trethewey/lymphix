@@ -1,0 +1,47 @@
+{
+  "_doc": "Ground-truth expectations per validation sample. Used by run_validation_cohort.sh to grade pipeline outputs.",
+  "samples": {
+    "JURKAT": {
+      "biology": "T-ALL cell line, monoclonal at TRA + TRB",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["TRB", "TRA"],
+      "expected_top_clones": [
+        {"locus": "TRB", "v_call_pattern": "TRBV12-3", "j_call_pattern": "TRBJ1-2", "cdr3_aa_contains": "CASSF"},
+        {"locus": "TRA", "v_call_pattern": "TRAV8-4",  "j_call_pattern": "TRAJ3",   "cdr3_aa_contains": "CAVSDLEPNS"}
+      ],
+      "expected_ighv_reportable": false
+    },
+    "NAMALWA": {
+      "biology": "Burkitt B-cell lymphoma cell line, monoclonal IGH (and IGK/IGL)",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [
+        {"locus": "IGH", "v_call_pattern": "IGHV", "j_call_pattern": "IGHJ"}
+      ],
+      "expected_ighv_reportable": true
+    },
+    "DAUDI": {
+      "biology": "Burkitt B-cell lymphoma cell line. Monoclonal IGH (specific V allele varies in literature; consensus is heavily-SHM'd IGHV gene, often IGHV3 or IGHV4 family). Originally derived 1968; subcloning across labs has produced slight variation.",
+      "expected_verdict_category": "clonal",
+      "expected_clonal_loci_any_of": ["IGH"],
+      "expected_top_clones": [
+        {"locus": "IGH", "v_call_pattern": "IGHV"}
+      ],
+      "expected_ighv_reportable": true,
+      "expected_ighv_status": "mutated"
+    },
+    "PBMC_HEALTHY": {
+      "biology": "Healthy donor peripheral blood (CellPlex 3'-biased RNA-seq). With 3'-biased libraries the IG/TCR 5' ends are not sequenced, so V(D)J yield is expected to be zero. Pipeline should produce no_signal — the correct clinical answer for this library type.",
+      "expected_verdict_category_any_of": ["no_signal", "no_clonal"],
+      "expected_clonal_loci_any_of": [],
+      "expected_top_clones": [],
+      "expected_ighv_reportable": false
+    }
+  },
+  "samplesheet": {
+    "JURKAT":       {"sra": "ERR3931301",   "paired": true,  "approx_gb": 0.7},
+    "NAMALWA":      {"sra": "SRR387396",    "paired": true,  "approx_gb": 2.5},
+    "DAUDI":        {"sra": "SRR17188123",  "paired": true,  "approx_gb": 2.4},
+    "PBMC_HEALTHY": {"sra": "SRR26965686",  "paired": true,  "approx_gb": 3.0}
+  }
+}
