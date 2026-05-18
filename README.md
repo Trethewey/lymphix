@@ -1,10 +1,10 @@
 <p align="center"><img src="assets/lymphix-stacked.svg" alt="Lymphix" width="340"/></p>
 
-# Lymphix
-
+<p align="center">
 BCR / TCR clonality and V(D)J rearrangement calling from 2×150 bp Illumina
 DNA capture NGS. Plain, TWIST UMI, and IDT xGen UMI-UDI libraries.
 Local Docker, HPC Singularity, or DNAnexus.
+</p>
 
 ---
 
