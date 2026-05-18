@@ -553,7 +553,7 @@ header { background: linear-gradient(135deg, #1B4F72 0%, #2C3E50 60%, #5D2018 10
          display: grid; grid-template-columns: auto 1fr; column-gap: 28px;
          align-items: center;
          border-bottom: 4px solid #E67E22; color: #ECF0F1; }
-header .logo { width: 260px; height: auto; }
+header .logo { width: 72px; height: auto; flex-shrink: 0; }
 header .titles { min-width: 0; }
 header .brand { font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
                 color: #BDC3C7; }
@@ -771,16 +771,19 @@ footer .footer-meta .name { color: #ECF0F1; }
 # ---------------------------------------------------------------------------
 def _load_logo_svg() -> str:
     """Return inline SVG markup with class='logo' so it can be embedded directly.
-    Falls back to a small text logo if assets/logo.svg is missing."""
-    candidates = [
-        Path(__file__).resolve().parents[1] / "assets" / "logo.svg",
-        Path(__file__).resolve().parent / "assets" / "logo.svg",
+    Prefers the mark-only logo for in-report headers; falls back to the older
+    logo.svg, then to a text-only logo if neither is present."""
+    asset_dirs = [
+        Path(__file__).resolve().parents[1] / "assets",
+        Path(__file__).resolve().parent / "assets",
     ]
-    for path in candidates:
-        if path.exists():
-            svg = path.read_text(encoding="utf-8")
-            # Inject class="logo" onto the <svg> root
-            return svg.replace("<svg ", '<svg class="logo" ', 1)
+    names = ("lymphix-mark.svg", "logo.svg")
+    for d in asset_dirs:
+        for name in names:
+            path = d / name
+            if path.exists():
+                svg = path.read_text(encoding="utf-8")
+                return svg.replace("<svg ", '<svg class="logo" ', 1)
     return '<div class="logo" style="font-weight:700; font-size:22px">Lymphix</div>'
 
 

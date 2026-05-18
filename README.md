@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.svg" alt="Lymphix" width="720"/></p>
+<p align="center"><img src="assets/lymphix-stacked.svg" alt="Lymphix" width="340"/></p>
 
 # Lymphix
 

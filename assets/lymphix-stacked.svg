@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 305" width="320" height="305">
+  <!-- Lymphix stacked logo — mark above wordmark, tight spacing. -->
+
+  <!-- ============ MARK ============ -->
+  <g transform="translate(60, 10)">
+    <!-- Trunk -->
+    <line x1="100" y1="180" x2="100" y2="130" stroke="#2C3E50" stroke-width="7" stroke-linecap="round"/>
+    <!-- Primary fork -->
+    <line x1="100" y1="130" x2="65"  y2="95"  stroke="#1B4F72" stroke-width="6" stroke-linecap="round"/>
+    <line x1="100" y1="130" x2="135" y2="95"  stroke="#922B21" stroke-width="6" stroke-linecap="round"/>
+    <!-- BCR secondary branches -->
+    <line x1="65" y1="95" x2="40" y2="55"  stroke="#1B4F72" stroke-width="5" stroke-linecap="round"/>
+    <line x1="65" y1="95" x2="72" y2="40"  stroke="#2E86C1" stroke-width="5" stroke-linecap="round"/>
+    <line x1="65" y1="95" x2="25" y2="80"  stroke="#85C1E9" stroke-width="5" stroke-linecap="round"/>
+    <!-- TCR secondary branches -->
+    <line x1="135" y1="95" x2="128" y2="40" stroke="#922B21" stroke-width="5" stroke-linecap="round"/>
+    <line x1="135" y1="95" x2="160" y2="55" stroke="#C0392B" stroke-width="5" stroke-linecap="round"/>
+    <line x1="135" y1="95" x2="175" y2="80" stroke="#E67E22" stroke-width="5" stroke-linecap="round"/>
+    <!-- Clonotype tips -->
+    <circle cx="40"  cy="55" r="6.5" fill="#1B4F72"/>
+    <circle cx="72"  cy="40" r="6.5" fill="#2E86C1"/>
+    <circle cx="25"  cy="80" r="6.5" fill="#85C1E9"/>
+    <circle cx="128" cy="40" r="6.5" fill="#922B21"/>
+    <circle cx="160" cy="55" r="6.5" fill="#C0392B"/>
+    <circle cx="175" cy="80" r="6.5" fill="#E67E22"/>
+  </g>
+
+  <!-- ============ WORDMARK ============ -->
+  <text x="160" y="245"
+        text-anchor="middle"
+        font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="56" font-weight="700" fill="#2C3E50" letter-spacing="-1">Lymphix</text>
+
+  <!-- ============ TAGLINE ============ -->
+  <text x="160" y="275"
+        text-anchor="middle"
+        font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="13" font-weight="500" fill="#7F8C8D" letter-spacing="3">BCR · TCR · CLONALITY</text>
+</svg>

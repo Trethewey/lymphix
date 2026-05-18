@@ -162,15 +162,17 @@ def build_clonality_heatmap(samples: dict[str, dict]) -> go.Figure:
 
 
 def find_logo() -> str:
-    """Return inline SVG logo content, or empty string if not found.
-    Looks at <script_dir>/../assets/logo.svg (the repo layout)."""
-    candidate = Path(__file__).resolve().parent.parent / "assets" / "logo.svg"
-    if not candidate.exists():
-        return ""
-    try:
-        return candidate.read_text(encoding="utf-8")
-    except OSError:
-        return ""
+    """Return inline SVG logo content (mark only, no wordmark), or empty
+    string if not found. Looks at <script_dir>/../assets/."""
+    base = Path(__file__).resolve().parent.parent / "assets"
+    for name in ("lymphix-mark.svg", "logo.svg"):
+        cand = base / name
+        if cand.exists():
+            try:
+                return cand.read_text(encoding="utf-8")
+            except OSError:
+                continue
+    return ""
 
 
 def render(samples: dict[str, dict], out: Path, plotly_mode: str = "inline") -> None:
@@ -210,7 +212,7 @@ def render(samples: dict[str, dict], out: Path, plotly_mode: str = "inline") -> 
   header {{ display: flex; align-items: center; gap: 20px;
             padding-bottom: 20px; border-bottom: 1px solid var(--rule);
             margin-bottom: 24px; }}
-  header .logo svg {{ width: 200px; height: auto; display: block; }}
+  header .logo svg {{ width: 72px; height: auto; display: block; }}
   header h1 {{ margin: 0; font-size: 24px; color: var(--brand); }}
   header .subtitle {{ margin-top: 4px; color: var(--ink-soft); font-size: 14px; }}
   .badge {{ display: inline-block; padding: 4px 10px; border-radius: 4px;
