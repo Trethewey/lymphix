@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Lymphix — single-command entry point.
+# Lymphix — no-install entry point.
 #
-# Usage:
-#     ./run.sh test                        # synthetic end-to-end on bundled mock data
-#     ./run.sh --samplesheet x.csv         # local run on real data (Docker required)
-#     ./run.sh dnanexus --project ID --samplesheet dx://...
-#     ./run.sh --help                      # full Nextflow help
+# If Lymphix is installed (pip install .), use the `lymphix` command instead:
+#     lymphix --samplesheet samples.csv --outdir results/
+#
+# This script does the same thing without installing anything:
+#     ./lymphix.sh test                        # analysis-layer smoke test on mock AIRR
+#     ./lymphix.sh --samplesheet x.csv         # local run on real data (Docker required)
+#     ./lymphix.sh dnanexus --project ID --samplesheet dx://...
+#     ./lymphix.sh --help                      # full Nextflow help
 
 set -euo pipefail
 
@@ -17,14 +20,14 @@ cd "$HERE"
 # ---------------------------------------------------------------------
 case "${1:-}" in
     test)
-        # Quick smoke test — no Docker, no Nextflow required.
-        # Runs the Python analysis layer on synthetic AIRR data.
+        # Exercises the Python analysis layer on synthetic AIRR fixtures.
+        # Does NOT run TRUST4, IgBLAST, Docker or Nextflow.
         exec bash tests/test_smoke.sh
         ;;
 
     dnanexus)
         shift
-        echo "[run.sh] Submitting to DNAnexus — see docs/DNANEXUS.md for prerequisites."
+        echo "[lymphix] Submitting to DNAnexus — see docs/DNANEXUS.md for prerequisites."
         exec dx run /applets/lymphix -i nextflow_pipeline_params="$*" --watch
         ;;
 
@@ -32,10 +35,13 @@ case "${1:-}" in
         cat <<EOF
 Lymphix — BCR/TCR clonality from custom-panel NGS.
 
-Usage:
-  ./run.sh test                                     Synthetic end-to-end test
-  ./run.sh --samplesheet SAMPLES.CSV [options]      Real-data run (needs Docker + Nextflow)
-  ./run.sh dnanexus --samplesheet ...               DNAnexus deployment
+Installed usage (after \`pip install .\`):
+  lymphix --samplesheet SAMPLES.CSV --outdir results/
+
+No-install usage:
+  ./lymphix.sh test                                 Analysis-layer smoke test (mock AIRR)
+  ./lymphix.sh --samplesheet SAMPLES.CSV [options]  Real-data run (needs Docker + Nextflow)
+  ./lymphix.sh dnanexus --samplesheet ...           DNAnexus deployment
 
 Common options (passed through to Nextflow):
   --samplesheet PATH        CSV: sample_id,fastq_1,fastq_2,bam,umi_preset,expected_status
@@ -55,11 +61,11 @@ esac
 # Default: pass through to nextflow with Docker profile
 # ---------------------------------------------------------------------
 command -v nextflow >/dev/null || {
-    echo "[run.sh] Nextflow not found. Install: curl -fsSL https://get.nextflow.io | bash"
+    echo "[lymphix] Nextflow not found. Install: curl -fsSL https://get.nextflow.io | bash"
     exit 1
 }
 command -v docker >/dev/null || {
-    echo "[run.sh] WARNING: Docker not found. Use -profile singularity or install Docker Desktop."
+    echo "[lymphix] WARNING: Docker not found. Use -profile singularity or install Docker Desktop."
 }
 
 exec nextflow run main.nf -profile docker "$@"

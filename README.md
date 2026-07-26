@@ -15,16 +15,23 @@ Local Docker, HPC Singularity, or DNAnexus.
 ## Quickstart
 
 ```bash
-./run.sh test                                              # smoke test, no Docker
-./run.sh --samplesheet samples.csv --outdir results/       # local run
-./run.sh dnanexus --samplesheet dx://project:/samples.csv  # DNAnexus
+pip install .                                              # installs the `lymphix` command
+
+lymphix test                                               # smoke test, no Docker
+lymphix --samplesheet samples.csv --outdir results/        # local run
+lymphix dnanexus --samplesheet dx://project:/samples.csv   # DNAnexus
 ```
+
+Without installing, `./lymphix.sh` takes the same arguments.
 
 ## Install
 
+- Lymphix itself — `pip install .` from a clone, or `pipx install .` to keep it
+  isolated. Provides the `lymphix` command. Python ≥ 3.9.
 - Nextflow ≥ 23.10 — `curl -fsSL https://get.nextflow.io | bash`
 - Docker Desktop *or* Singularity
-- Python 3.10+ with pandas, numpy, plotly, jinja2, scipy, pytest (smoke test only)
+- Python dependencies (pandas, numpy, plotly, jinja2) are pulled in automatically
+  by `pip install .`; add `pip install .[test]` for pytest
 
 DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
 

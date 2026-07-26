@@ -19,6 +19,13 @@ test_data/
 *.truth.json
 *.log
 
+# Python packaging
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
 # Editors / OS
 .DS_Store
 __pycache__/

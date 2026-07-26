@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lymphix"
+dynamic = ["version"]
+description = "BCR/TCR clonality and V(D)J rearrangement calling from Illumina DNA capture NGS"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Chris Trethewey" }]
+keywords = [
+    "immune repertoire",
+    "BCR",
+    "TCR",
+    "VDJ",
+    "clonality",
+    "lymphoma",
+    "CLL",
+    "Nextflow",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "plotly",
+    "jinja2",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/Trethewey/lymphix"
+Repository = "https://github.com/Trethewey/lymphix"
+
+[project.scripts]
+lymphix = "lymphix.cli:main"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lymphix*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
