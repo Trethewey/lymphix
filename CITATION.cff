@@ -6,7 +6,8 @@ message: >-
 type: software
 authors:
   - family-names: Trethewey
-    given-names: "C. S."
+    given-names: Chris
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
 repository-code: "https://github.com/Trethewey/lymphix"
 url: "https://github.com/Trethewey/lymphix"
 abstract: >-
@@ -26,7 +27,7 @@ keywords:
   - CLL
   - Nextflow
   - DNAnexus
-license: MIT
+license: AGPL-3.0-or-later
 version: "0.1.0"
 date-released: "2026-05-13"
 references:

@@ -6,6 +6,10 @@ DNA capture NGS. Plain, TWIST UMI, and IDT xGen UMI-UDI libraries.
 Local Docker, HPC Singularity, or DNAnexus.
 </p>
 
+<p align="center">
+<a href="LICENSE"><img src="https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue.svg" alt="Licence: AGPL-3.0-or-later"/></a>
+</p>
+
 ---
 
 ## Quickstart
@@ -237,5 +241,17 @@ See [`CITATION.cff`](CITATION.cff) for the machine-readable form.
 
 ## Licence
 
-MIT. Third-party: TRUST4 (MIT) · IgBLAST (public domain) · fastp (MIT) ·
-fgbio (MIT) · BWA (GPL-3) · samtools (MIT) · Nextflow (Apache-2.0) · Plotly (MIT).
+Copyright © 2026 C.S. Trethewey.
+
+Lymphix is free software under the **GNU Affero General Public License v3.0 or
+later** (AGPL-3.0-or-later) — see [`LICENSE`](LICENSE). Commercial use is
+permitted. If you modify Lymphix and either distribute it or run it as a
+network service, you must release your modified source under the same licence.
+
+Lymphix was previously distributed under the MIT licence. Copies already
+obtained under MIT remain usable under those terms; the AGPL applies to this
+and all subsequent versions.
+
+Third-party tools keep their own licences: TRUST4 (MIT) · IgBLAST (public
+domain) · fastp (MIT) · fgbio (MIT) · BWA (GPL-3) · samtools (MIT) ·
+Nextflow (Apache-2.0) · Plotly (MIT).
