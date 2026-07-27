@@ -41,3 +41,7 @@ __pycache__/
 *.pem
 *.key
 dxapp.json.lock
+
+# Dev-tree workflow (app/lymphix only — never committed to github push)
+.dev-state.json
+sync_to_github.ps1

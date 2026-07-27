@@ -102,6 +102,31 @@ Each row uses **FASTQ or BAM, not both**. UMI presets require FASTQ.
 
 UMI samples require `--bwa_index <dir>` (a BWA-indexed reference).
 
+## WGS samples
+
+Lymphix was tuned on CAPP-seq / capture data (500–2000× per-position depth at
+IG loci, 5,000–20,000 V(D)J reads per sample). WGS at 30–40× gives ~30 reads
+per IG-locus position and yields only **~150–300 V(D)J reads per sample**,
+below the standard low-yield warning threshold.
+
+For WGS inputs, pass `--wgs` to `clonality_metrics` to relax the V-match
+floor (98 → 60 nt) and switch the composition denominator to V(D)J reads
+only. Decide your supporting-read sensitivity explicitly with `-c/--clones`
+(default 2; use 1 to recover sub-threshold clonotypes at the cost of a higher
+noise floor; 3+ to be stricter):
+
+```bash
+python3 bin/clonality_metrics.py --wgs -c 1 \
+    --sample-id S001 --trust4-airr S001_airr.tsv --igblast-airr S001_airr.tsv \
+    --out-metrics S001.metrics.json \
+    --out-clonotypes S001.clonotypes.tsv --out-top S001.top_clones.tsv
+```
+
+WGS samples are still depth-limited. The dominant IGH clone (if present) and
+IGHV mutation status are robust; per-locus clonotype counts in the long tail
+are noise. Translocation-disrupted IGH (common in DLBCL) cannot be assembled
+by TRUST4 regardless of threshold — that's an out-of-scope limitation.
+
 ## Outputs
 
 ```

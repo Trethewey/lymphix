@@ -35,11 +35,20 @@ LOCI_ORDER = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
 
 
 def load_sample(root: Path, sample_id: str) -> tuple[dict, pd.DataFrame] | None:
-    results = root / f"{sample_id}_results"
-    metrics_path = results / f"{sample_id}.metrics.json"
-    clones_path  = results / f"{sample_id}.clonotypes.tsv"
-    if not metrics_path.exists():
+    """Load one sample's metrics + clonotypes from the cohort root.
+
+    Tries the canonical pipeline layout first:
+        <root>/<sample_id>/<sample_id>.metrics.json
+    Falls back to the legacy `<sample_id>_results/` suffix for older runs.
+    """
+    candidates = [
+        root / sample_id / f"{sample_id}.metrics.json",
+        root / f"{sample_id}_results" / f"{sample_id}.metrics.json",  # legacy
+    ]
+    metrics_path = next((p for p in candidates if p.exists()), None)
+    if metrics_path is None:
         return None
+    clones_path = metrics_path.parent / f"{sample_id}.clonotypes.tsv"
     metrics = json.loads(metrics_path.read_text())
     clones = pd.read_csv(clones_path, sep="\t") if clones_path.exists() else pd.DataFrame()
     return metrics, clones

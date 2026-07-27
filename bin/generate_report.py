@@ -188,7 +188,12 @@ def compute_verdict(metrics: dict, df=None) -> dict:
     # ---- Light-chain restriction (supporting evidence) -------------------
     kl_call = comp.get("kappa_lambda_call")
     klr     = comp.get("kappa_lambda_ratio")
-    if kl_call and kl_call not in ("balanced", "no_lambda_reads") and bcr_clonal:
+    # Only claim light-chain restriction when the κ:λ ratio is computable AND
+    # outside the physiological range. The metrics module emits two soft calls
+    # — "no_light_chain_reads" and "kappa_only" — that are NOT restrictions
+    # (they're panel/coverage-limited): excluded here, surfaced in the report
+    # body section but not the verdict.
+    if kl_call in ("kappa_restricted", "lambda_restricted") and bcr_clonal and klr is not None:
         details.append(f"Light-chain restriction: <b>{kl_call.replace('_',' ')}</b> "
                        f"(κ:λ = {klr:.2f}; normal range 0.5–2.5).")
 

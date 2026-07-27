@@ -474,15 +474,25 @@ def compute_composition(df: pd.DataFrame,
     else:
         igk_reads = int(df.loc[df["locus"] == "IGK", "read_count"].sum())
         igl_reads = int(df.loc[df["locus"] == "IGL", "read_count"].sum())
-    kappa_lambda_ratio = (igk_reads / igl_reads) if igl_reads > 0 else None
-    if kappa_lambda_ratio is None:
-        kappa_lambda_call = "no_lambda_reads"
-    elif kappa_lambda_ratio > KAPPA_LAMBDA_NORMAL_HIGH:
-        kappa_lambda_call = "kappa_restricted"
-    elif kappa_lambda_ratio < KAPPA_LAMBDA_NORMAL_LOW:
-        kappa_lambda_call = "lambda_restricted"
+    # κ:λ call. Three sources of an undefined ratio used to all land in
+    # "no_lambda_reads" (misleading: implied a λ deficit when in fact most
+    # of the time it meant "panel doesn't cover light chains at all").
+    # Discriminate them now so cohort-level QC can distinguish "uninterpretable"
+    # from "kappa-only with no lambda counter-reads".
+    if igk_reads == 0 and igl_reads == 0:
+        kappa_lambda_ratio = None
+        kappa_lambda_call  = "no_light_chain_reads"      # panel or signal limit
+    elif igl_reads == 0:
+        kappa_lambda_ratio = None
+        kappa_lambda_call  = "kappa_only"                # strong κ skew OR IGL-uncaptured panel
+    elif igk_reads == 0:
+        kappa_lambda_ratio = 0.0
+        kappa_lambda_call  = "lambda_restricted"         # extreme λ dominance
     else:
-        kappa_lambda_call = "balanced"
+        kappa_lambda_ratio = igk_reads / igl_reads
+        if   kappa_lambda_ratio > KAPPA_LAMBDA_NORMAL_HIGH: kappa_lambda_call = "kappa_restricted"
+        elif kappa_lambda_ratio < KAPPA_LAMBDA_NORMAL_LOW:  kappa_lambda_call = "lambda_restricted"
+        else:                                              kappa_lambda_call = "balanced"
 
     return {
         "total_input_reads_known":   denom_known,
@@ -503,12 +513,20 @@ def compute_composition(df: pd.DataFrame,
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+_SENTINEL = object()  # marker for "user did not set this argument on CLI"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sample-id",        required=True)
     ap.add_argument("--trust4-airr",      required=True, type=Path)
     ap.add_argument("--igblast-airr",     required=True, type=Path)
-    ap.add_argument("--min-clone-count",  type=int,   default=2)
+    ap.add_argument("-c", "--clones", "--min-clone-count",
+                    dest="min_clone_count", type=int, default=2,
+                    help="Drop clonotypes with fewer than N supporting reads (default 2). "
+                         "At WGS depth, 1 surfaces sub-threshold clonotypes but raises the "
+                         "noise floor; 3+ is stricter than the default CAPP-seq tuning. "
+                         "Set what fits your data — the pipeline does not decide for you.")
     ap.add_argument("--igh-mutated-cutoff", type=float, default=98.0)
     ap.add_argument("--top-n",            type=int,   default=50)
     ap.add_argument("--clonal-dominance-threshold", type=float, default=0.05,
@@ -516,10 +534,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--total-input-reads", type=int, default=None,
                     help="Total reads in the input FASTQ/BAM (denominator for background fraction). "
                          "If omitted, background defaults to 0.")
-    ap.add_argument("--composition-denominator", choices=["total", "vdj"], default="total",
+    ap.add_argument("--composition-denominator", choices=["total", "vdj"], default=_SENTINEL,
                     help="Composition fraction denominator: 'total' (default — %% of total input "
                          "reads, suitable for repertoire panels) or 'vdj' (%% of V(D)J-assigned "
-                         "reads only, suitable for cancer-gene panels where IG is a small target).")
+                         "reads only, suitable for cancer-gene panels where IG is a small target; "
+                         "default under --wgs).")
+    ap.add_argument("--wgs", action="store_true",
+                    help="WGS preset for whole-genome data (~30-40x per-position; "
+                         "yields ~150-300 V(D)J reads vs CAPP-seq's thousands). "
+                         "Sets germline-min-v-match=60 (WGS reads less reliably span the V "
+                         "region) and composition-denominator=vdj. Does NOT change "
+                         "--clones / min-clone-count — set that explicitly with -c.")
     ap.add_argument("--filter-germline-rearrangements",
                     dest="filter_germline_rearrangements",
                     action="store_true", default=True,
@@ -547,6 +572,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out-clonotypes",   required=True, type=Path)
     ap.add_argument("--out-top",          required=True, type=Path)
     args = ap.parse_args(argv)
+
+    # Resolve --wgs preset defaults. Sentinel == "not set on CLI".
+    wgs = bool(args.wgs)
+    if args.composition_denominator is _SENTINEL:
+        args.composition_denominator = "vdj" if wgs else "total"
+    if wgs and args.germline_min_v_match is None:
+        args.germline_min_v_match = 60   # WGS reads less reliably span the V region
 
     trust4  = read_airr(args.trust4_airr)
     igblast = read_airr(args.igblast_airr)
@@ -635,6 +667,7 @@ def main(argv: list[str] | None = None) -> int:
 
     metrics = {
         "sample_id":      args.sample_id,
+        "wgs_mode":       wgs,
         "min_clone_count": args.min_clone_count,
         "read_length":    args.read_length,
         "germline_rearrangement_filter": germline_filter_stats,
