@@ -164,6 +164,12 @@ def summarise_sample(metrics_path: Path) -> dict:
         "sample_id":            m.get("sample_id", metrics_path.parent.name),
         "wgs_mode":             bool(m.get("wgs_mode")),
         "min_clone_count":      m.get("min_clone_count"),
+        # n_clonotypes and every diversity column below mean different things
+        # depending on these two, so they travel with the numbers rather than
+        # living only in the per-sample metrics.json. Absent from metrics
+        # written before collapsing existed, which is the same as "off".
+        "collapse_clonotypes":  bool(m.get("collapse_clonotypes")),
+        "collapse_key":         m.get("collapse_key"),
         "n_clonotypes":         int(agg.get("n_clonotypes") or 0),
         "vdj_reads":            int(agg.get("n_reads") or 0),
         "top_clone_fraction":   _safe_float(agg.get("top_clone_fraction")),

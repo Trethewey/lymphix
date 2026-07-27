@@ -378,6 +378,345 @@ def apply_germline_rearrangement_filter(df: pd.DataFrame, *,
     }
 
 
+# ---------------------------------------------------------------------------
+# Clonotype collapsing
+# ---------------------------------------------------------------------------
+# WHY THIS EXISTS
+# ---------------
+# TRUST4 emits one AIRR row per (assembly, CDR3 variant), not one row per clone.
+# A single rearrangement therefore arrives as a dominant row plus a tail of
+# near-identical rows carrying a handful of reads each. Counting those rows as
+# clonotypes inflates N in every diversity metric — Shannon, Simpson, Gini, D50
+# and the clonality index all take N or the read distribution directly — so a
+# monoclonal sample reads as more diverse than it is, and the "dominant clone"
+# may be a fragment rather than the clone.
+#
+# Two things were established on the real cohorts before this was written, and
+# they shape the keys offered here:
+#
+#   1. Keying on V + J + junction nt merges nothing at all. Across 40 samples
+#      with clonotypes, the number of distinct (V, J, junction nt) triples
+#      equalled the row count in every single sample. The rows that need
+#      merging differ in the junction itself, so any key containing the full
+#      junction nt is a no-op against them.
+#   2. Keying on the junction amino acid sequence is actively unsafe. Rows with
+#      an untranslatable junction (out-of-frame, stop codon) carry a blank
+#      junction_aa and all key to the empty string; 22 of those 40 samples had
+#      more than one such row, one had nine. Merging them lumps unrelated
+#      rearrangements together under "unknown".
+#
+# So collapsing is done in two stages, and the caller chooses how far to go.
+COLLAPSE_KEY_EXACT    = "locus_junction_nt"
+COLLAPSE_KEY_HAMMING1 = "locus_junction_nt_hamming1"
+COLLAPSE_KEYS = (COLLAPSE_KEY_EXACT, COLLAPSE_KEY_HAMMING1)
+
+# Abundance gate for the stage-2 near-neighbour merge. A minor row is absorbed
+# only if it holds no more than this fraction of the anchor row's reads.
+# Deliberately a parameter rather than a constant: nothing in the sequence
+# distinguishes a sequencing error from a genuine somatic-hypermutation
+# variant of the same clone — only relative abundance does, and where the line
+# sits is a judgement about the assay, not a fact about the data. The observed
+# error tail sits at 0.1-0.3% of its parent, so 2% clears it with room to spare
+# while leaving a subclone at 5% of the dominant clone standing.
+DEFAULT_COLLAPSE_MINOR_FRACTION = 0.02
+
+# How a collapsed clone's read count is derived. Recorded in metrics.json
+# because the choice is not neutral — see _aggregate_read_count().
+COLLAPSE_READ_AGGREGATION = "sum_within_assembly_max_across_assemblies"
+
+
+def _assembly_of(sequence_id) -> str:
+    """Return the TRUST4 assembly (contig) a row came from.
+
+    TRUST4 names AIRR rows `<assembly>_<variant index>`, e.g. `assemble5_0`,
+    `assemble5_1`. Everything after the final underscore is the variant index,
+    so stripping it recovers the contig the variants were called against.
+    Anything not shaped that way is treated as its own assembly, which is the
+    conservative reading for non-TRUST4 input.
+    """
+    text = "" if sequence_id is None else str(sequence_id)
+    if isinstance(sequence_id, float) and math.isnan(sequence_id):
+        text = ""
+    head, sep, tail = text.rpartition("_")
+    return head if (sep and tail.isdigit() and head) else text
+
+
+def _aggregate_read_count(sub: pd.DataFrame) -> int:
+    """Read support for a collapsed clone: sum within an assembly, max across.
+
+    Summing within one assembly is safe and is what TRUST4 intends. The
+    per-variant abundances in `_cdr3.out` are fractional read weights that
+    partition the reads spanning that CDR3 — a read ambiguous between two
+    variants is split between them, not counted twice — so the sum
+    reconstructs the assembly's read support.
+
+    Summing ACROSS assemblies is not safe, and could not be verified from the
+    files TRUST4 writes: none of them maps read identifiers to assemblies. When
+    one rearrangement is assembled twice against paralogous V references
+    (IGKV3-15 and IGKV3D-15, say) the two contigs may well be built from the
+    same reads, and adding them would invent read support that does not exist.
+    Taking the larger of the two is the conservative reading: it never inflates
+    a clone, and at worst it understates one by the reads unique to the smaller
+    contig. Understating a clone's depth costs sensitivity; overstating it
+    manufactures evidence, which is the worse failure in a clinical report.
+    """
+    per_assembly = sub.groupby("_assembly", sort=False)["read_count"].sum()
+    return int(per_assembly.max())
+
+
+def _best_identity(sub: pd.DataFrame, column: str):
+    """Pick one V identity for a collapsed clone from its member rows.
+
+    `sub` must already be sorted with the dominant row first.
+
+    Preference order: the dominant row's own value, then the value from the
+    highest-read member that carries one. Never a mean, and never a
+    read-weighted mean: averaging a 94% variant with a 100% variant lands on
+    97%, a number belonging to neither row and sitting on the mutated side of
+    the 98% IGHV cutoff. That number goes straight into a prognostic call.
+
+    Borrowing a minor row's identity when the dominant row has none is sound
+    because the members of a collapsed clone differ in the junction, not in the
+    V region — they are the same rearrangement seen through assembly noise.
+    """
+    if column not in sub.columns:
+        return np.nan
+    values = pd.to_numeric(sub[column], errors="coerce")
+    present = values.dropna()
+    return float(present.iloc[0]) if not present.empty else np.nan
+
+
+def _cell_text(value) -> str:
+    """Normalise a table cell to a string, mapping missing values to ''.
+
+    pandas leaves an absent junction or gene call as NaN, which is truthy and
+    stringifies to the literal 'nan'. Left unnormalised that is a
+    three-character "sequence" that can be compared, bucketed and merged like
+    any other.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, float) and math.isnan(value):
+        return ""
+    text = str(value)
+    return "" if text == "nan" else text
+
+
+def _hamming_is_one(a: str, b: str) -> bool:
+    """True if a and b are the same length and differ at exactly one position."""
+    if len(a) != len(b):
+        return False
+    diff = 0
+    for x, y in zip(a, b):
+        if x != y:
+            diff += 1
+            if diff > 1:
+                return False
+    return diff == 1
+
+
+def _exact_groups(df: pd.DataFrame) -> list[list[int]]:
+    """Stage 1 — group rows sharing a locus and an identical junction nt.
+
+    The V call is deliberately excluded. The only exact duplicates in the real
+    data are one rearrangement assembled twice against duplicate V references
+    (IGKV3-15 vs IGKV3D-15, IGKV2-28 vs IGKV2D-29, the IGLV5-37/45/48/52
+    family): same junction nt, same junction aa, same J, different V paralogue.
+    Keying on V keeps them apart, which is exactly the split we are here to
+    close — in one sample they are the top two "clones".
+
+    Rows with a blank junction nt are never grouped. They would otherwise all
+    key to the empty string and merge unrelated rearrangements together, the
+    same trap that rules out keying on junction_aa.
+    """
+    groups: dict[tuple, list[int]] = {}
+    singletons: list[list[int]] = []
+    for pos, (locus, junction) in enumerate(zip(df["locus"], df["junction"])):
+        junc = _cell_text(junction)
+        if not junc:
+            singletons.append([pos])
+            continue
+        groups.setdefault((locus, junc), []).append(pos)
+    return list(groups.values()) + singletons
+
+
+def _absorb_near_neighbours(df: pd.DataFrame,
+                            groups: list[list[int]],
+                            reads: list[int],
+                            minor_fraction_max: float) -> list[list[int]]:
+    """Stage 2 — absorb single-substitution minor variants into their parent.
+
+    Candidates are compared only within the same locus, J gene and junction
+    length; a length change is an indel or a different rearrangement, not the
+    substitution noise this addresses.
+
+    Two rules keep this from over-merging:
+
+      * the abundance gate — a group is absorbed only if it holds at most
+        `minor_fraction_max` of the anchor's reads. Somatic hypermutation
+        produces genuine lineage members one nucleotide from the parent, and
+        nothing in the sequence tells them apart from an error; only the
+        relative abundance does.
+      * every absorbed group must be within one substitution OF THE ANCHOR,
+        not of any group already absorbed. Single-linkage chaining walks
+        A-B-C and merges sequences two or more substitutions apart; anchored
+        comparison cannot.
+
+    Anchors are taken in descending read order, so the largest group in a
+    neighbourhood always acts as the parent and an absorbed group can never
+    become an anchor itself.
+    """
+    order = sorted(range(len(groups)), key=lambda i: (-reads[i], i))
+    anchor_of: dict[int, int] = {}
+    absorbed: set[int] = set()
+    anchors: set[int] = set()
+
+    # Bucket by (locus, J gene, junction length) so the pairwise scan stays
+    # local rather than quadratic over the whole table.
+    buckets: dict[tuple, list[int]] = {}
+    facts: dict[int, tuple] = {}
+    for gi, members in enumerate(groups):
+        top = members[0]                      # members are read-sorted already
+        junc = _cell_text(df["junction"].iloc[top])
+        j_gene = _cell_text(df["j_call"].iloc[top]).split("*")[0].split(",")[0]
+        locus = df["locus"].iloc[top]
+        facts[gi] = (junc, (locus, j_gene, len(junc)))
+        buckets.setdefault((locus, j_gene, len(junc)), []).append(gi)
+
+    for gi in order:
+        if gi in absorbed:
+            continue
+        junc, bucket_key = facts[gi]
+        if not junc:
+            continue
+        anchors.add(gi)
+        for other in buckets.get(bucket_key, ()):
+            # A group that has already acted as an anchor is never absorbed:
+            # otherwise its own absorbed members would be orphaned and their
+            # reads would vanish from the table.
+            if other == gi or other in absorbed or other in anchors:
+                continue
+            if reads[other] > reads[gi]:
+                continue
+            if reads[other] > minor_fraction_max * reads[gi]:
+                continue
+            if _hamming_is_one(junc, facts[other][0]):
+                anchor_of[other] = gi
+                absorbed.add(other)
+
+    merged: list[list[int]] = []
+    for gi, members in enumerate(groups):
+        if gi in absorbed:
+            continue
+        combined = list(members)
+        for other, anchor in anchor_of.items():
+            if anchor == gi:
+                combined.extend(groups[other])
+        merged.append(combined)
+    return merged
+
+
+def collapse_clonotype_rows(df: pd.DataFrame, *,
+                            key: str = COLLAPSE_KEY_EXACT,
+                            minor_fraction_max: float = DEFAULT_COLLAPSE_MINOR_FRACTION
+                            ) -> tuple[pd.DataFrame, dict]:
+    """Collapse TRUST4 assembly-variant rows into clones.
+
+    Returns (collapsed_df, stats). Every column of the input survives, taken
+    from the dominant (highest-read) member of each clone, except:
+      * `read_count`, replaced by the aggregate described in
+        _aggregate_read_count();
+      * `v_identity` / `igblast_v_identity`, filled from the best available
+        member as described in _best_identity();
+      * `n_collapsed_rows`, added — how many AIRR rows the clone came from.
+
+    The dominant member also supplies the V, D, J, junction and junction_aa,
+    on the same reasoning: it is the best-supported assembly of the clone, so
+    where the variants disagree its call is the one with the most reads behind
+    it. Ties are broken on sequence_id so the output is deterministic.
+    """
+    if key not in COLLAPSE_KEYS:
+        raise ValueError(f"unknown collapse key: {key!r} (expected one of {COLLAPSE_KEYS})")
+
+    if df.empty:
+        return df, collapse_stats(df, applied=True, key=key,
+                                  minor_fraction_max=minor_fraction_max)
+
+    work = df.reset_index(drop=True).copy()
+    work["_assembly"] = work["sequence_id"].map(_assembly_of) if "sequence_id" in work.columns \
+        else pd.Series([""] * len(work), index=work.index)
+
+    # Sort dominant-first, deterministically, then work on positions. Every
+    # downstream step relies on members[0] being the dominant row.
+    work["_seq_id_str"] = (work["sequence_id"].astype(str)
+                           if "sequence_id" in work.columns else "")
+    work = work.sort_values(["read_count", "_seq_id_str"], ascending=[False, True],
+                            kind="mergesort").reset_index(drop=True)
+
+    groups = _exact_groups(work)
+    groups = [sorted(g) for g in groups]      # positions are already read-sorted
+    group_reads = [_aggregate_read_count(work.iloc[g]) for g in groups]
+
+    if key == COLLAPSE_KEY_HAMMING1:
+        groups = _absorb_near_neighbours(work, groups, group_reads, minor_fraction_max)
+        groups = [sorted(g) for g in groups]
+
+    rows = []
+    for members in groups:
+        sub = work.iloc[members]
+        row = sub.iloc[0].to_dict()           # dominant member supplies V/D/J/junction
+        row["read_count"] = _aggregate_read_count(sub)
+        for column in ("v_identity", "igblast_v_identity"):
+            if column in work.columns:
+                row[column] = _best_identity(sub, column)
+        row["n_collapsed_rows"] = len(members)
+        rows.append(row)
+
+    out = pd.DataFrame(rows, columns=list(work.columns) + ["n_collapsed_rows"])
+    out = out.drop(columns=["_assembly", "_seq_id_str"])
+    out = out.sort_values(["read_count"], ascending=False,
+                          kind="mergesort").reset_index(drop=True)
+
+    stats = collapse_stats(df, applied=True, key=key,
+                           minor_fraction_max=minor_fraction_max,
+                           collapsed=out)
+    return out, stats
+
+
+def collapse_stats(df: pd.DataFrame, *,
+                   applied: bool,
+                   key: str | None = None,
+                   minor_fraction_max: float | None = None,
+                   collapsed: pd.DataFrame | None = None) -> dict:
+    """Describe a collapse (or the absence of one) for metrics.json.
+
+    Emitted whether or not collapsing ran, so that a metrics.json is never
+    ambiguous about which convention produced its clonotype counts.
+    """
+    if collapsed is None:
+        collapsed = df
+    rows_in = 0 if df is None or df.empty else int(len(df))
+    clones_out = 0 if collapsed is None or collapsed.empty else int(len(collapsed))
+
+    per_locus = {}
+    for locus in LOCI:
+        n_in = 0 if df is None or df.empty else int((df["locus"] == locus).sum())
+        n_out = 0 if collapsed is None or collapsed.empty else int((collapsed["locus"] == locus).sum())
+        per_locus[locus] = {"rows_in": n_in, "clones_out": n_out,
+                            "rows_merged": n_in - n_out}
+    return {
+        "applied":            bool(applied),
+        "key":                key if applied else None,
+        "read_aggregation":   COLLAPSE_READ_AGGREGATION if applied else None,
+        "minor_fraction_max": (float(minor_fraction_max)
+                               if applied and key == COLLAPSE_KEY_HAMMING1 else None),
+        "n_rows_in":          rows_in,
+        "n_clones_out":       clones_out,
+        "n_rows_merged":      rows_in - clones_out,
+        "per_locus":          per_locus,
+    }
+
+
 def _json_safe(obj):
     """Recursively replace NaN/Infinity with None so json.dumps stays strict."""
     if isinstance(obj, dict):
@@ -594,6 +933,35 @@ def main(argv: list[str] | None = None) -> int:
                     dest="filter_germline_rearrangements",
                     action="store_false",
                     help="Disable the germline-rearrangement filter (keep raw TRUST4 output).")
+    ap.add_argument("--collapse-clonotypes", action="store_true", default=False,
+                    help="Collapse TRUST4 assembly-variant rows into clones before any "
+                         "metric is computed. DEFAULT OFF: it changes n_clonotypes and "
+                         "therefore every diversity metric, so it must be switched on "
+                         "deliberately and the choice is recorded in metrics.json. "
+                         "Measure the effect on your own data before adopting it.")
+    ap.add_argument("--collapse-key", choices=list(COLLAPSE_KEYS),
+                    default=COLLAPSE_KEY_EXACT,
+                    help="Which rows count as the same clone. "
+                         "'locus_junction_nt' (default) merges only rows with an "
+                         "identical junction nt at the same locus — exact, no "
+                         "judgement, catches one rearrangement assembled twice against "
+                         "paralogous V references. "
+                         "'locus_junction_nt_hamming1' additionally absorbs "
+                         "single-substitution minor variants into their parent clone "
+                         "subject to --collapse-minor-fraction; that is the merge that "
+                         "addresses the assembly-noise tail, and it is a judgement "
+                         "about error versus subclone. Ignored without "
+                         "--collapse-clonotypes.")
+    ap.add_argument("--collapse-minor-fraction", type=float,
+                    default=DEFAULT_COLLAPSE_MINOR_FRACTION,
+                    help="Abundance gate for the near-neighbour merge: a single-"
+                         "substitution variant is absorbed only if it holds at most "
+                         "this fraction of its parent's reads (default 0.02 = 2%%). "
+                         "Nothing in the sequence separates a sequencing error from a "
+                         "real hypermutated subclone — only abundance does — so raising "
+                         "this absorbs genuine subclones and lowering it leaves noise "
+                         "behind. Only used with --collapse-key "
+                         "locus_junction_nt_hamming1.")
     ap.add_argument("--read-length", type=int, default=150,
                     help="Sequencing read length (nt). Used to (a) compute the "
                          "cdr3_spanned_by_single_read flag and (b) auto-scale the "
@@ -649,6 +1017,19 @@ def main(argv: list[str] | None = None) -> int:
             min_v_identity=args.germline_min_v_identity,
             min_junction_diversity=args.germline_min_junction_diversity)
         germline_filter_stats["thresholds"]["min_v_match_adaptive"] = (args.germline_min_v_match is None)
+
+    # Clonotype collapsing. Deliberately placed here — after the row-level
+    # filters, before everything else — so that the min-count and germline
+    # filters still see raw TRUST4 rows (which is what their thresholds were
+    # tuned against) while every metric below sees the same collapsed set. No
+    # metric is computed on the uncollapsed table.
+    if args.collapse_clonotypes:
+        df, collapse_summary = collapse_clonotype_rows(
+            df,
+            key=args.collapse_key,
+            minor_fraction_max=args.collapse_minor_fraction)
+    else:
+        collapse_summary = collapse_stats(df, applied=False)
 
     # Read-length-aware annotation: which CDR3s were directly observed on a
     # single read, vs reconstructed by assembly
@@ -733,6 +1114,13 @@ def main(argv: list[str] | None = None) -> int:
         "sample_id":      args.sample_id,
         "wgs_mode":       wgs,
         "min_clone_count": args.min_clone_count,
+        # Flat mirrors of clonotype_collapse.applied / .key. n_clonotypes and
+        # every diversity metric mean different things depending on these two
+        # values, so they sit alongside the other run-defining settings where a
+        # reader (and the flattened cohort table) cannot miss them.
+        "collapse_clonotypes": bool(collapse_summary["applied"]),
+        "collapse_key":        collapse_summary["key"],
+        "clonotype_collapse":  collapse_summary,
         "read_length":    args.read_length,
         "germline_rearrangement_filter": germline_filter_stats,
         "cdr3_inference": cdr3_inference,
@@ -761,8 +1149,14 @@ def main(argv: list[str] | None = None) -> int:
         top_rows.append(sub)
     pd.concat(top_rows, ignore_index=True).to_csv(args.out_top, sep="\t", index=False)
 
+    collapse_note = ""
+    if collapse_summary["applied"]:
+        collapse_note = (f"collapsed={collapse_summary['n_rows_in']}"
+                         f"->{collapse_summary['n_clones_out']} "
+                         f"key={collapse_summary['key']} ")
     print(f"[clonality_metrics] sample={args.sample_id} "
           f"clonotypes={len(df)} "
+          f"{collapse_note}"
           f"aggregate_clonality={aggregate.get('clonality_index')}")
     return 0
 

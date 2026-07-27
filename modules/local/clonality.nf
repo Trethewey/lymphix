@@ -14,6 +14,12 @@ process CLONALITY {
     path  "versions.yml", emit: versions
 
     script:
+    // Opt-in only. Absent params.collapse_clonotypes, no collapse flag reaches
+    // the script at all, so the numbers are the uncollapsed ones.
+    def collapse = params.collapse_clonotypes
+        ? "--collapse-clonotypes --collapse-key ${params.collapse_key} " +
+          "--collapse-minor-fraction ${params.collapse_minor_fraction}"
+        : ""
     """
     clonality_metrics.py \\
         --sample-id ${sample_id} \\
@@ -21,6 +27,7 @@ process CLONALITY {
         --igblast-airr ${igblast_airr} \\
         --min-clone-count ${params.min_clone_count} \\
         --igh-mutated-cutoff ${params.igh_mutated_cutoff} \\
+        ${collapse} \\
         --out-metrics ${sample_id}.metrics.json \\
         --out-clonotypes ${sample_id}.clonotypes.tsv \\
         --out-top ${sample_id}.top_clones.tsv

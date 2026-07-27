@@ -49,6 +49,12 @@ def helpMessage() {
       --bwa_index            Path to BWA index dir (required if any sample uses a UMI preset)
       --igh_mutated_cutoff   V-identity %% for IGHV-unmutated     (default: 98.0)
       --min_clone_count      Min reads per clonotype             (default: 2)
+      --collapse_clonotypes  Collapse TRUST4 assembly-variant rows into clones
+                             before any metric is computed       (default: false)
+      --collapse_key         locus_junction_nt | locus_junction_nt_hamming1
+                                                                 (default: locus_junction_nt)
+      --collapse_minor_fraction
+                             Abundance gate for the hamming1 key (default: 0.02)
 
     Profiles:
       -profile docker | singularity | test | dnanexus

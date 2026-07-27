@@ -199,6 +199,63 @@ IGHV mutation status are robust; per-locus clonotype counts in the long tail
 are noise. Translocation-disrupted IGH (common in DLBCL) cannot be assembled
 by TRUST4 regardless of threshold — that's an out-of-scope limitation.
 
+## Clonotype collapsing (opt-in, default OFF)
+
+TRUST4 writes one AIRR row per **(assembly, CDR3 variant)**, not one row per
+clone. A single rearrangement therefore arrives as a dominant row plus a tail
+of near-identical rows carrying a handful of reads each — on the validation
+cohorts, 132 of 195 minor rows were exactly one substitution from the dominant
+row of their group, and 159 of them carried five reads or fewer. Counted as
+clonotypes, that tail inflates N in Shannon, Simpson, Gini, D50 and the
+clonality index simultaneously, and can hand "dominant clone" to a fragment.
+
+Collapsing is available and **off by default**. It changes `n_clonotypes` and
+therefore every diversity metric for every sample, so it must be an explicit
+choice, and every `metrics.json` records which convention produced its numbers
+(`collapse_clonotypes`, `collapse_key`, and a `clonotype_collapse` block with
+rows in / clones out per locus). Measure the effect on your own data before
+adopting it.
+
+```bash
+lymphix metrics --collapse-clonotypes \
+    --collapse-key locus_junction_nt_hamming1 --collapse-minor-fraction 0.02 \
+    --sample-id S001 --trust4-airr S001_airr.tsv --igblast-airr S001_airr.tsv \
+    --out-metrics S001.metrics.json \
+    --out-clonotypes S001.clonotypes.tsv --out-top S001.top_clones.tsv
+```
+
+Two keys:
+
+| `--collapse-key` | Merges | Judgement involved |
+|---|---|---|
+| `locus_junction_nt` (default) | Rows with an identical junction nt at the same locus | None — exact |
+| `locus_junction_nt_hamming1`  | The above, plus single-substitution variants below `--collapse-minor-fraction` of their parent | Yes — where error ends and subclone begins |
+
+The V call is deliberately **not** part of either key. The only exact
+duplicates in real data are one rearrangement assembled twice against
+paralogous V references (IGKV3-15 / IGKV3D-15, IGKV2-28 / IGKV2D-29, the
+IGLV5-37/45/48/52 family); keying on V keeps them apart, which is the split
+that most needs closing. Nor is the junction amino acid sequence a key: rows
+with an untranslatable junction all carry a blank `junction_aa` and would pool
+unrelated rearrangements under "unknown".
+
+Two things to know before you switch it on:
+
+* **Read counts are summed within an assembly, and maxed across assemblies.**
+  TRUST4's per-variant abundances partition the reads spanning a CDR3, so
+  summing them within one contig reconstructs its support. No TRUST4 output
+  maps read identifiers to contigs, so whether two contigs share reads is
+  unverifiable — taking the larger never invents depth, which is the failure
+  that matters in a report.
+* **The direction of travel is not uniform.** `clonality_index = 1 − H/log N`
+  has N in the denominator, so removing the noise tail raises clonality on a
+  single-clone sample but lowers it on a sample with two or more real clones.
+  Collapsing also pushes low-yield samples below `INDETERMINATE_MAX_CLONOTYPES`
+  (5), so some genuinely polyclonal samples will start reading as
+  indeterminate.
+
+Under Nextflow: `--collapse_clonotypes true --collapse_key ... --collapse_minor_fraction ...`.
+
 ## Outputs
 
 The Nextflow workflow lays results out like this. On the analysis-layer route
