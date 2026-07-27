@@ -16,6 +16,7 @@ work/
 results/
 results_*/
 test_data/
+validation_data/          # default DATA_DIR for tests/run_validation_cohort.sh
 *.truth.json
 *.log
 

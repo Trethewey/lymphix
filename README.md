@@ -3,7 +3,8 @@
 <p align="center">
 BCR / TCR clonality and V(D)J rearrangement calling from 2×150 bp Illumina
 DNA capture NGS. Plain, TWIST UMI, and IDT xGen UMI-UDI libraries.
-Local Docker, HPC Singularity, or DNAnexus.
+Runs as a Python analysis layer over TRUST4 output, or as a containerised
+Nextflow workflow.
 </p>
 
 <p align="center">
@@ -12,13 +13,61 @@ Local Docker, HPC Singularity, or DNAnexus.
 
 ---
 
-## Quickstart
+## Two layers, two levels of support
+
+**The analysis layer** — clonality metrics, lineage composition, κ:λ, IGHV
+status, per-sample and cohort HTML — is the supported path. Every real cohort
+processed with Lymphix, the validation cohort below included, was run this way:
+TRUST4 invoked natively, then the `lymphix` command over its AIRR output.
+
+**The Nextflow workflow** (`main.nf`) wraps that same analysis layer together
+with fastp, fgbio UMI consensus, TRUST4 and IgBLAST in containers, for local
+Docker, HPC Singularity and DNAnexus. It has not been run end to end on real
+data, and it has known gaps — for instance the `CLONALITY` process never passes
+`--total-input-reads`, so composition falls back to a V(D)J-read denominator and
+the background pool is always zero. Read `main.nf` before you rely on it.
+
+## Quickstart — analysis layer
 
 ```bash
-pip install .                                              # installs the `lymphix` command
+pip install .                # installs the `lymphix` command; Python ≥ 3.9
 
-lymphix test                                               # smoke test, no Docker
-lymphix --samplesheet samples.csv --outdir results/        # local run
+lymphix test                 # smoke test on mock AIRR: no TRUST4, IgBLAST, Docker or Nextflow
+
+# 1. Assemble V(D)J natively with TRUST4 (installed separately)
+run-trust4 -f hg38_bcrtcr.fa --ref human_IMGT+C.fa \
+    -1 S001_R1.fastq.gz -2 S001_R2.fastq.gz -o S001 -t 8
+
+# 2. Clonality metrics + clonotype tables
+#    TOTAL_READS = reads in the input FASTQ/BAM; omit for a V(D)J-only denominator
+lymphix metrics --sample-id S001 \
+    --trust4-airr S001_airr.tsv --igblast-airr S001_airr.tsv \
+    --total-input-reads "$TOTAL_READS" --composition-denominator vdj \
+    --out-metrics    S001.metrics.json \
+    --out-clonotypes S001.clonotypes.tsv \
+    --out-top        S001.top_clones.tsv
+
+# 3. Per-sample HTML report
+lymphix report --sample-id S001 \
+    --metrics S001.metrics.json --clonotypes S001.clonotypes.tsv \
+    --out S001.report.html
+
+# 4. Cohort overview across a results directory
+lymphix cohort --results-dir results/2026-07-26_mycohort --cohort-id mycohort \
+    --out results/2026-07-26_mycohort/_cohort_summary.html
+```
+
+`--igblast-airr` is required. If you have not run IgBLAST, pass the TRUST4 AIRR
+table to both flags: V-identity, productivity and in-frame flags then come from
+TRUST4's own annotation. That is what the validation cohort does.
+
+`lymphix --help` lists the rest — `compare`, `grade`, `simulate`, `merge-airr`,
+`airr-to-fasta`.
+
+## Quickstart — Nextflow workflow (not yet validated)
+
+```bash
+lymphix --samplesheet samples.csv --outdir results/        # nextflow run -profile docker
 lymphix dnanexus --samplesheet dx://project:/samples.csv   # DNAnexus
 ```
 
@@ -26,19 +75,24 @@ Without installing, `./lymphix.sh` takes the same arguments.
 
 ## Install
 
-- Lymphix itself — `pip install .` from a clone, or `pipx install .` to keep it
-  isolated. Provides the `lymphix` command. Python ≥ 3.9.
-- Nextflow ≥ 23.10 — `curl -fsSL https://get.nextflow.io | bash`
-- Docker Desktop *or* Singularity
-- Python dependencies (pandas, numpy, plotly, jinja2) are pulled in automatically
-  by `pip install .`; add `pip install .[test]` for pytest
+- Lymphix — `pip install .` from a clone, or `pipx install .` to keep it
+  isolated. Provides the `lymphix` command. Python ≥ 3.9. The Python
+  dependencies (pandas, numpy, plotly, jinja2) come with it; add
+  `pip install .[test]` for pytest.
+- TRUST4 — needed for real data; Lymphix does not install it.
+  [github.com/liulab-dfci/TRUST4](https://github.com/liulab-dfci/TRUST4)
+- IgBLAST — optional, as above.
+- Nextflow ≥ 23.10 (`curl -fsSL https://get.nextflow.io | bash`) plus Docker
+  Desktop *or* Singularity — only for the containerised workflow.
 
-DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md).
+DNAnexus: [`docs/DNANEXUS.md`](docs/DNANEXUS.md). The applet runs the Nextflow
+workflow, so it carries the same caveat.
 
 ## Sample sheet
 
-A CSV with one row per sample. Pick the template matching your data, copy
-it, replace the file names with your own.
+Only the Nextflow workflow reads a sample sheet; the analysis-layer commands
+take file paths directly. A CSV with one row per sample. Pick the template
+matching your data, copy it, replace the file names with your own.
 
 | Your data | Template |
 |---|---|
@@ -67,6 +121,11 @@ Each row uses **FASTQ or BAM, not both**. UMI presets require FASTQ.
 
 ## What it does
 
+Steps 1–4 belong to the Nextflow workflow; on the supported route you run
+TRUST4 yourself, and IgBLAST only if you want its annotation. Steps 5–9 are the
+analysis layer, and are what `lymphix metrics` and `lymphix report` do. Step 10
+is Nextflow-only.
+
 1. **Trim & QC** — fastp.
 2. **UMI consensus** (when `umi_preset != none`) — fgbio: `FastqToBam` →
    `bwa mem` → `GroupReadsByUmi` → consensus calling (duplex for xGen) →
@@ -78,19 +137,30 @@ Each row uses **FASTQ or BAM, not both**. UMI presets require FASTQ.
 5. **Clonality metrics** — per locus and aggregate: Shannon H, normalised
    H, Simpson D, Gini, D50, top-clone fraction, **clonality index**
    (1 − H/log N).
-6. **Composition call** — eight read pools summing to 100% of total input:
-   - Clonal B-cell (IGH-, κ-, λ-restricted)
+6. **Composition call** — eight mutually-exclusive read pools:
+   - Clonal B-cell (IGH-, κ-, λ-restricted) — three pools
    - Polyclonal B-cell
-   - Clonal T-cell (αβ TRB, γδ TRG/TRD)
-   - Polyclonal T-cell
+   - Clonal T-cell (αβ TRB, γδ TRG/TRD) — two pools
+   - Polyclonal T-cell (TRA reads always land here; TRA alone is not
+     diagnostic of clonality)
    - Background / germline
+
+   They sum to 100% of total input reads only when `--total-input-reads` is
+   supplied and `--composition-denominator total` is in force. Otherwise the
+   denominator is V(D)J-assigned reads and background is zero.
 7. **κ:λ ratio** — light-chain restriction flag (clinical range 0.5–2.5).
-8. **IGHV mutation status** — CLL prognostic call (≥ 98% V-identity = unmutated).
+8. **IGHV mutation status** — CLL prognostic call on the *dominant* IGH clone
+   (≥ 98% V-identity = unmutated), plus a descriptive repertoire-wide tally.
+   Reported as `unknown` when the dominant clone carries no V-identity.
 9. **HTML report** per sample — Plotly + Jinja2, self-contained.
-10. **Cohort QC** — per-sample pass/fail vs `expected_status` written to
-    `pipeline_info/qc_assertions.tsv`.
+10. **Cohort QC** (Nextflow only) — per-sample pass/fail vs `expected_status`
+    written to `pipeline_info/qc_assertions.tsv`. Only `expected_status=negative`
+    is actually asserted on.
 
 ## UMI presets
+
+UMI consensus calling lives in the Nextflow workflow, so it inherits that
+caveat.
 
 | Preset | Read structure (fgbio) | Consensus | Typical use |
 |---|---|---|---|
@@ -107,16 +177,18 @@ UMI samples require `--bwa_index <dir>` (a BWA-indexed reference).
 Lymphix was tuned on CAPP-seq / capture data (500–2000× per-position depth at
 IG loci, 5,000–20,000 V(D)J reads per sample). WGS at 30–40× gives ~30 reads
 per IG-locus position and yields only **~150–300 V(D)J reads per sample**,
-below the standard low-yield warning threshold.
+around or below the 200-read low-yield threshold at which the report raises a
+reduced-confidence warning.
 
-For WGS inputs, pass `--wgs` to `clonality_metrics` to relax the V-match
-floor (98 → 60 nt) and switch the composition denominator to V(D)J reads
-only. Decide your supporting-read sensitivity explicitly with `-c/--clones`
+For WGS inputs, pass `--wgs` to relax the germline-filter V-match floor
+(98 → 60 nt at the default 150 bp read length; the floor otherwise scales as
+0.65 × read length) and switch the composition denominator to V(D)J reads only.
+Decide your supporting-read sensitivity explicitly with `-c/--clones`
 (default 2; use 1 to recover sub-threshold clonotypes at the cost of a higher
 noise floor; 3+ to be stricter):
 
 ```bash
-python3 bin/clonality_metrics.py --wgs -c 1 \
+lymphix metrics --wgs -c 1 \
     --sample-id S001 --trust4-airr S001_airr.tsv --igblast-airr S001_airr.tsv \
     --out-metrics S001.metrics.json \
     --out-clonotypes S001.clonotypes.tsv --out-top S001.top_clones.tsv
@@ -128,6 +200,9 @@ are noise. Translocation-disrupted IGH (common in DLBCL) cannot be assembled
 by TRUST4 regardless of threshold — that's an out-of-scope limitation.
 
 ## Outputs
+
+The Nextflow workflow lays results out like this. On the analysis-layer route
+you choose the paths yourself; name run directories `YYYY-MM-DD_description`.
 
 ```
 results/
@@ -157,10 +232,14 @@ results/
   <img src="examples/report_composition.png" alt="Lineage composition" width="100%"/>
 </p>
 
-Full HTML reports and `metrics.json` in [`examples/`](examples/).
-Regenerate with `make test-smoke`.
+Example `metrics.json` for a clonal and a polyclonal sample are in
+[`examples/`](examples/). `bash tests/test_smoke.sh` builds equivalent reports
+from mock AIRR into `results_smoke_test/`; it does not write to `examples/`.
 
 ## Build the containers
+
+Only the Nextflow workflow uses these; the analysis layer runs from the pip
+install.
 
 ```bash
 make build                                       # build all 5 images locally
@@ -168,13 +247,25 @@ make push                                        # push to ghcr.io/trethewey/lym
 make push REGISTRY=ghcr.io/myorg/lymphix         # override registry if needed
 ```
 
+`make build` tags every image `$(TAG)`, default `0.1.0`, but the modules ask
+for tool-versioned tags — `fastp:0.23.4`, `trust4:1.0.13`, `igblast:1.22.0`,
+`fgbio:0.1.0`, `clonality:0.1.0`. Build the first three with a matching
+`TAG=`, or the workflow will look for images that do not exist — another reason
+to treat the Nextflow route as unvalidated.
+
 ## Tests
 
 ```bash
-make test           # unit + smoke
-make test-unit      # pytest math tests
-make test-smoke     # mock-AIRR → clonality_metrics → report
+python -m pytest tests/ -q   # full suite: metrics maths + regression tests
+bash tests/test_smoke.sh     # mock AIRR → clonality_metrics → report
+make test                    # both, via make test-unit + make test-smoke
 ```
+
+Neither exercises TRUST4, IgBLAST, Docker or Nextflow: the smoke test starts
+from mock AIRR fixtures generated by `tests/make_mock_airr.py` and asserts the
+clonal sample scores a clonality index > 0.3 and the polyclonal one < 0.1.
+`make test-unit` runs `tests/test_clonality_metrics.py` alone — use `pytest
+tests/` to include the regression suite as well.
 
 ## Validation cohort
 
@@ -191,25 +282,33 @@ Cellosaurus IDs and original references.
 | NAMALWA      | CVCL_0067 | Burkitt lymphoma            | clonal (IGH) |
 | DAUDI        | CVCL_0008 | Burkitt lymphoma            | clonal (IGH, mutated IGHV) |
 | RAJI         | CVCL_0511 | Burkitt lymphoma            | clonal (IGH, mutated IGHV) |
-| OCI-LY1      | CVCL_1879 | DLBCL                       | clonal (IGH) |
+| OCI-LY1      | CVCL_1879 | Germinal-centre DLBCL       | clonal (IGH, typically mutated IGHV) |
 | U-266        | CVCL_0566 | Multiple myeloma            | clonal (IGH) |
 | MM.1S        | CVCL_8792 | Multiple myeloma            | clonal (IGH) |
 | PBMC_HEALTHY | —         | Healthy donor, 3' scRNA-seq | no_signal (chemistry-correct) |
 | POLYCLONAL_SIM | —       | Synthetic polyclonal        | no_clonal |
 
-Run end-to-end (downloads ~25 GB from ENA, ~1 h):
+Run it end to end — this is the analysis-layer route, not Nextflow: the script
+downloads FASTQ from ENA, runs TRUST4 natively, then `clonality_metrics.py`,
+`generate_report.py`, `grade_validation.py` and `cohort_report.py`. It needs
+`run-trust4`, `wget` and about 25 GB of free disk; runtime depends on `THREADS`
+(default 8). Re-runs are idempotent — completed samples are skipped.
 
 ```bash
 tests/run_validation_cohort.sh [DATA_DIR]
 ```
 
-Verdict table, lineage-composition stacked bar, and per-locus
-clonality-index heatmap on one self-contained page. Two builds:
+IgBLAST is not run: the TRUST4 AIRR table is passed as both inputs, so
+V-identity comes from TRUST4.
+
+The cohort overview it produces is checked in: verdict table,
+lineage-composition stacked bar, and per-locus clonality-index heatmap on one
+self-contained page. Two builds:
 
 | File | Size | Use |
 |---|---|---|
 | [`examples/cohort_overview.html`](examples/cohort_overview.html)         | 4.9 MB | inline Plotly, offline-safe (firewalled clinical networks) |
-| [`examples/cohort_overview_cdn.html`](examples/cohort_overview_cdn.html) |  40 KB | loads Plotly from CDN, needs internet |
+| [`examples/cohort_overview_cdn.html`](examples/cohort_overview_cdn.html) |  39 KB | loads Plotly from CDN, needs internet |
 
 **View rendered in your browser** (uses the CDN build):
 [htmlpreview.github.io / cohort_overview_cdn.html](https://htmlpreview.github.io/?https://github.com/Trethewey/lymphix/blob/main/examples/cohort_overview_cdn.html)
@@ -221,8 +320,18 @@ For a permanent URL on this repo, enable
 
 ## Panel BED
 
-`regions/clonality_BCR_TCR.bed` (hg38, `chr` prefix) and
-`regions/clonality_BCR_TCR.no_chr.bed` (Ensembl/GIAB-style). On-target QC only.
+`assets/regions/clonality_BCR_TCR.bed` (hg38, `chr` prefix) and
+`assets/regions/clonality_BCR_TCR.no_chr.bed` (Ensembl/GIAB-style), with
+`assets/regions/clonality_BCR_TCR_regions.tsv` giving the same intervals
+annotated with locus, BIOMED-2 tube, tiling and role.
+
+These are reference material for on-target QC and panel design — no Lymphix
+step reads them. `params.panel_bed` in `nextflow.config` points at the
+`chr`-prefixed BED but is not consumed by any process.
+
+Note the role column: IGH V-region coverage is flagged as needed for IGHV
+mutation status. A panel that anchors only on J and constant regions can still
+call clonality but cannot support a CLL prognostic call.
 
 ## Citations
 
