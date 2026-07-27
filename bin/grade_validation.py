@@ -22,6 +22,12 @@ from pathlib import Path
 
 import pandas as pd
 
+# The grader must apply exactly the rule the reports apply, or a green
+# validation run says nothing about what a clinician will actually see. It
+# previously carried two separate transcriptions of that rule — one to derive
+# the category and a second, a few lines later, to list the clonal loci.
+from lymphix_common import verdict_category   # noqa: E402
+
 
 def grade_sample(sample_id: str, metrics_path: Path, clonotypes_path: Path,
                   expected: dict) -> dict:
@@ -45,41 +51,11 @@ def grade_sample(sample_id: str, metrics_path: Path, clonotypes_path: Path,
     comp = metrics.get("composition") or {}
     ighv = metrics.get("ighv_status") or {}
 
-    # Derive observed verdict category from metrics (mirror generate_report logic)
+    # Observed verdict, from the same rule the reports use.
     vdj_reads = (comp or {}).get("vdj_assigned_reads", 0) or 0
     n_clones  = agg.get("n_clonotypes", 0) or 0
-    obs_category = None
-    if vdj_reads == 0 or n_clones == 0:
-        obs_category = "no_signal"
-    else:
-        from collections import defaultdict
-        clonal_loci = []
-        for L, m in (metrics.get("per_locus") or {}).items():
-            if not m: continue
-            ci   = m.get("clonality_index") or 0
-            top  = m.get("top_clone_fraction") or 0
-            n    = m.get("n_clonotypes") or 0
-            reads = m.get("n_reads") or 0
-            multi = ci >= 0.30 and top >= 0.20
-            single = (n == 1) and (reads >= 20)
-            if multi or single:
-                clonal_loci.append(L)
-        if clonal_loci:
-            obs_category = "clonal"
-        elif n_clones < 5:
-            obs_category = "indeterminate"
-        else:
-            obs_category = "no_clonal"
-
-    obs_clonal_loci = []
-    for L, m in (metrics.get("per_locus") or {}).items():
-        if not m: continue
-        ci, top, n, reads = (m.get("clonality_index") or 0,
-                              m.get("top_clone_fraction") or 0,
-                              m.get("n_clonotypes") or 0,
-                              m.get("n_reads") or 0)
-        if (ci >= 0.30 and top >= 0.20) or (n == 1 and reads >= 20):
-            obs_clonal_loci.append(L)
+    obs_category, obs_clonal_loci = verdict_category(
+        metrics.get("per_locus") or {}, vdj_reads, n_clones)
 
     reasons_pass, reasons_fail = [], []
 

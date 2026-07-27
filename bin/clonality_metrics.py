@@ -31,9 +31,11 @@ import pandas as pd
 
 import re
 
-LOCI     = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
-BCR_LOCI = ["IGH", "IGK", "IGL"]
-TCR_LOCI = ["TRA", "TRB", "TRG", "TRD"]
+from lymphix_common import (
+    LOCI,
+    LOCUS_CLONAL_INDEX_THRESHOLD,
+    is_locus_clonal,
+)
 
 # Clinical κ:λ ratio reference range (light-chain restriction flag)
 KAPPA_LAMBDA_NORMAL_LOW  = 0.5
@@ -415,7 +417,7 @@ def compute_composition(df: pd.DataFrame,
                         total_input_reads: int | None,
                         clonal_threshold: float,
                         denominator: str = "total",
-                        locus_clonality_min: float = 0.30) -> dict:
+                        locus_clonality_min: float = LOCUS_CLONAL_INDEX_THRESHOLD) -> dict:
     """
     Partition total input reads into eight mutually-exclusive pools:
         clonal_IGH, clonal_IGK_kappa, clonal_IGL_lambda, polyclonal_B,
@@ -447,20 +449,23 @@ def compute_composition(df: pd.DataFrame,
         df["_locus_total"]    = df.groupby("locus")["read_count"].transform("sum")
         df["_locus_fraction"] = df["read_count"] / df["_locus_total"]
 
-        # Locus is clonal if either:
-        #   (a) clonality_index >= locus_clonality_min, or
-        #   (b) n_clonotypes == 1 AND n_reads >= SINGLE_CLONE_READS_MIN.
-        # (b) covers the monoclonal case where clonality_index is undefined.
-        SINGLE_CLONE_READS_MIN = 20
+        # Which loci carry a clonal expansion. The rule is the shared one in
+        # lymphix_common, with require_dominance=False: the per-clone gate on
+        # `clonal_threshold` below already tests dominance for every read being
+        # binned, so applying the repertoire-level top-clone test here as well
+        # would demand dominance twice and empty the clonal pools of samples
+        # the verdict still calls clonal. See is_locus_clonal() for the full
+        # reasoning — this is the only caller allowed to pass that flag.
         locus_clonal_call = {}
         for locus in LOCI:
             cnts = df.loc[df["locus"] == locus, "read_count"].to_numpy()
-            ci = clonality_index(cnts)
-            multi_clone_clonal = (ci is not None
-                                  and not (isinstance(ci, float) and ci != ci)
-                                  and ci >= locus_clonality_min)
-            single_clone_clonal = (cnts.size == 1 and int(cnts.sum()) >= SINGLE_CLONE_READS_MIN)
-            locus_clonal_call[locus] = multi_clone_clonal or single_clone_clonal
+            locus_clonal_call[locus] = is_locus_clonal(
+                clonality_index=clonality_index(cnts),
+                n_clonotypes=cnts.size,
+                n_reads=int(cnts.sum()),
+                require_dominance=False,
+                clonality_min=locus_clonality_min,
+            )
 
         for _, r in df.iterrows():
             locus  = r["locus"]

@@ -31,7 +31,6 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
-import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -43,37 +42,27 @@ from jinja2 import Template
 
 
 # ---------------------------------------------------------------------------
-# Constants — mirror generate_report.py so cohort styling matches per-sample
+# Constants — shared with generate_report.py via lymphix_common
 # ---------------------------------------------------------------------------
-LOCI     = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
-BCR_LOCI = ["IGH", "IGK", "IGL"]
-TCR_LOCI = ["TRA", "TRB", "TRG", "TRD"]
-
-BCR_COLORS = {"IGH": "#1B4F72", "IGK": "#2E86C1", "IGL": "#85C1E9"}
-TCR_COLORS = {"TRB": "#922B21", "TRA": "#C0392B", "TRG": "#E67E22", "TRD": "#F5B041"}
-LOCUS_COLORS = {**BCR_COLORS, **TCR_COLORS}
-
-COMP_LABELS = {
-    "clonal_IGH":              "Clonal IGH",
-    "clonal_IGK_kappa":        "Clonal IGK (κ)",
-    "clonal_IGL_lambda":       "Clonal IGL (λ)",
-    "polyclonal_B":            "Polyclonal B",
-    "clonal_TRB":              "Clonal TRB",
-    "clonal_TRG_gamma_delta":  "Clonal TRG/TRD",
-    "polyclonal_T":            "Polyclonal T",
-    "background":              "Background",
-}
-COMP_COLORS = {
-    "clonal_IGH":              "#1B4F72",
-    "clonal_IGK_kappa":        "#2E86C1",
-    "clonal_IGL_lambda":       "#85C1E9",
-    "polyclonal_B":            "#D6EAF8",
-    "clonal_TRB":              "#922B21",
-    "clonal_TRG_gamma_delta":  "#E67E22",
-    "polyclonal_T":            "#FAD7A0",
-    "background":              "#7F8C8D",
-}
-COMP_ORDER = list(COMP_LABELS.keys())
+# These were previously re-declared here with the comment "mirror
+# generate_report.py". They did not mirror it: the labels and the verdict rule
+# had both drifted, so the same sample could carry one colour and one call in
+# its own report and a different pair in the cohort view.
+from lymphix_common import (            # noqa: E402
+    BCR_LOCI,
+    COMP_COLORS,
+    COMP_LABELS,
+    COMP_ORDER,
+    LOCI,
+    VERDICT_COLORS,
+    VERDICT_LABELS,
+    inline_plotly_js,
+    lineage_verdict,
+    load_logo_svg,
+    per_locus_from_flat_row,
+    safe_float as _safe_float,
+    verdict_category,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -205,66 +194,26 @@ def summarise_sample(metrics_path: Path) -> dict:
     return row
 
 
-def _safe_float(v):
-    if v is None:
-        return None
-    try:
-        f = float(v)
-        if math.isnan(f):
-            return None
-        return f
-    except (TypeError, ValueError):
-        return None
-
-
-SINGLE_CLONE_READS_MIN = 20  # match generate_report.py
-
 def derive_verdict(r: dict) -> str:
-    """Cohort-table verdict — must match generate_report.py compute_verdict()
-    semantics, otherwise cohort and per-sample reports disagree (see audit
-    BUG-02 / ARCH-01)."""
-    if (r["vdj_reads"] or 0) == 0:
-        return "no_signal"
-    if r["vdj_reads"] < 200:
-        return "indeterminate"
+    """Cohort-table verdict for one flattened row.
 
-    def _is_clonal(L):
-        # multi-clone rule: real clonality + dominance
-        if (r.get(f"{L}_clonality") or 0) >= 0.30 and (r.get(f"{L}_top_fraction") or 0) >= 0.20:
-            return True
-        # single-clone fallback: 1 clone at the locus with enough supporting
-        # reads. clonality_index is NaN for n=1 so the multi-clone rule never
-        # fires — without this fallback we mislabel real monoclonal samples
-        # like A2776_JRG_tumour (1 IGH clone, 943 reads, IGHV unmutated) as
-        # no_clonal.
-        n = r.get(f"{L}_n_clones") or 0
-        if n == 1 and (r.get(f"{L}_n_reads") or 0) >= SINGLE_CLONE_READS_MIN:
-            return True
-        return False
+    Delegates to the shared rule so the cohort table and the per-sample report
+    cannot disagree about the same metrics.json — which is precisely what the
+    hand-written copy that used to live here did. It tested the V(D)J yield
+    *before* the clonality and returned 'indeterminate' for any sample under
+    LOW_VDJ_YIELD_ABSOLUTE reads, so a low-input sample with an unambiguous
+    dominant clone appeared as clonal in its own report and as indeterminate
+    in the cohort. The shared rule assesses clonality first; low yield is a
+    warning carried on the report, not a verdict that erases the finding.
 
-    for L in BCR_LOCI:
-        if _is_clonal(L):
-            return "clonal_B"
-    for L in TCR_LOCI:
-        if _is_clonal(L):
-            return "clonal_T"
-    return "no_clonal"
-
-
-VERDICT_COLORS = {
-    "clonal_B":      "#1B4F72",
-    "clonal_T":      "#922B21",
-    "no_clonal":     "#27ae60",
-    "indeterminate": "#e67e22",
-    "no_signal":     "#7F8C8D",
-}
-VERDICT_LABELS = {
-    "clonal_B":      "Clonal B",
-    "clonal_T":      "Clonal T",
-    "no_clonal":     "No clonal expansion",
-    "indeterminate": "Indeterminate (low yield)",
-    "no_signal":     "No V(D)J signal",
-}
+    The clonal_B / clonal_T split is kept because the cohort figures colour by
+    it; it comes from lineage_verdict() applied to the shared clonal loci.
+    """
+    per_locus = per_locus_from_flat_row(r)
+    category, loci = verdict_category(per_locus,
+                                      r.get("vdj_reads") or 0,
+                                      r.get("n_clonotypes") or 0)
+    return lineage_verdict(category, loci)
 
 
 # ---------------------------------------------------------------------------
@@ -672,34 +621,6 @@ footer .footer-meta .name { color: #ECF0F1; }
 
 
 # ---------------------------------------------------------------------------
-# Logo loader (mirrors generate_report.py)
-# ---------------------------------------------------------------------------
-def _load_logo_svg() -> str:
-    asset_dirs = [
-        Path(__file__).resolve().parents[1] / "assets",
-        Path(__file__).resolve().parent / "assets",
-    ]
-    for d in asset_dirs:
-        for name in ("lymphix-mark.svg", "logo.svg"):
-            p = d / name
-            if p.exists():
-                svg = p.read_text(encoding="utf-8")
-                return svg.replace("<svg ", '<svg class="logo" ', 1)
-    return '<div class="logo" style="font-weight:700; font-size:22px">Lymphix</div>'
-
-
-def _plotly_js() -> str:
-    """Inline plotly.js so the report is self-contained."""
-    try:
-        import plotly.io as pio
-        return f"<script>{pio._html.get_plotlyjs()}</script>"
-    except Exception:
-        pass
-    # Fallback: CDN
-    return '<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>'
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def build_cohort_summary(results_dir: Path, cohort_id: str, out_path: Path,
@@ -778,9 +699,9 @@ def build_cohort_summary(results_dir: Path, cohort_id: str, out_path: Path,
         fig_ighv_distribution = fig_ighv_distribution(df),
         recurring_clones = recurring,
         runinfo          = runinfo,
-        plotly_js        = _plotly_js() if inline_plotly else
+        plotly_js        = inline_plotly_js() if inline_plotly else
                            '<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>',
-        logo_svg         = _load_logo_svg(),
+        logo_svg         = load_logo_svg(),
     )
 
     out_path.write_text(html, encoding="utf-8")

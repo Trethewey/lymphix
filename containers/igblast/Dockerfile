@@ -44,6 +44,9 @@ RUN chmod +x /opt/scripts/build_germline_db.sh \
 
 RUN pip3 install --no-cache-dir pandas==2.2.2
 
+# Both are standalone: they import pandas and nothing from bin/. If either ever
+# imports lymphix_common (or any other bin/ module), that module has to be
+# copied here as well or the task fails at run time with an ImportError.
 COPY bin/airr_to_fasta.py /opt/scripts/airr_to_fasta.py
 COPY bin/merge_airr.py    /opt/scripts/merge_airr.py
 RUN chmod +x /opt/scripts/*.py

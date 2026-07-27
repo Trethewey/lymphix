@@ -22,7 +22,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-LOCI       = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
+from lymphix_common import LOCI      # noqa: E402  (see bin/lymphix_common.py)
+
 SEG_TYPES  = ("V", "D", "J", "C")
 QUAL_STR   = chr(33 + 35)  # Q35 ASCII
 COMP       = str.maketrans("ACGTNacgtn", "TGCANtgcan")

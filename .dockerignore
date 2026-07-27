@@ -1,0 +1,22 @@
+# The build context is the repository root (see the Makefile `build-%` target).
+# containers/clonality/Dockerfile copies the whole of bin/, so anything that
+# would ride along in it has to be excluded here — a stale __pycache__ built by
+# a Windows checkout of a different Python version is the obvious one.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+.nextflow*
+work/
+results/
+results_*/
+test_data/
+validation_data/
+*.bam
+*.bai
+*.cram
+*.crai
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz

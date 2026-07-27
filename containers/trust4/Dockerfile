@@ -24,6 +24,11 @@ ENV PATH=/opt/trust4:$PATH
 
 RUN pip3 install --no-cache-dir biopython==1.83 numpy==1.26.4
 
+# simulate_repertoire.py imports the shared locus list from lymphix_common, so
+# that module must travel with it. Anything added here that imports another
+# bin/ module needs the same treatment — the failure is an ImportError inside a
+# running task, not a build error.
+COPY bin/lymphix_common.py      /opt/scripts/lymphix_common.py
 COPY bin/simulate_repertoire.py /opt/scripts/simulate_repertoire.py
 COPY bin/airr_to_fasta.py       /opt/scripts/airr_to_fasta.py
 RUN chmod +x /opt/scripts/*.py

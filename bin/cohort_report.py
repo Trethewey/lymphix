@@ -15,23 +15,24 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
-try:
-    from plotly.io import get_plotlyjs
-except ImportError:
-    from plotly.offline import get_plotlyjs
 
+# Shared definitions live in bin/lymphix_common.py. This file previously kept
+# its own composition palette and its own copy of the clonality rule; the
+# palette disagreed with the per-sample report's (so a sample changed colour
+# between the two documents) and the rule was a third transcription of the
+# same five literals.
+from lymphix_common import (            # noqa: E402
+    COMP_COLORS,
+    COMP_LABELS,
+    COMP_ORDER,
+    LOCI,
+    inline_plotly_js,
+    load_logo_svg,
+    verdict_category,
+)
 
-COMPOSITION_POOLS = [
-    ("clonal_IGH",            "Clonal IGH",        "#1f4e79"),
-    ("clonal_IGK_kappa",      "Clonal IGK (kappa)", "#2e75b6"),
-    ("clonal_IGL_lambda",     "Clonal IGL (lambda)","#5b9bd5"),
-    ("polyclonal_B",          "Polyclonal B",       "#bdd7ee"),
-    ("clonal_TRB",            "Clonal TRB",         "#c00000"),
-    ("clonal_TRG_gamma_delta","Clonal TRG/TRD",     "#e6804f"),
-    ("polyclonal_T",          "Polyclonal T",       "#f8cbad"),
-    ("background",            "Background",         "#bfbfbf"),
-]
-LOCI_ORDER = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
+COMPOSITION_POOLS = [(k, COMP_LABELS[k], COMP_COLORS[k]) for k in COMP_ORDER]
+LOCI_ORDER = LOCI
 
 
 def load_sample(root: Path, sample_id: str) -> tuple[dict, pd.DataFrame] | None:
@@ -55,28 +56,12 @@ def load_sample(root: Path, sample_id: str) -> tuple[dict, pd.DataFrame] | None:
 
 
 def derive_verdict(metrics: dict) -> tuple[str, list[str]]:
-    """Mirror the report/grading logic for verdict + clonal loci."""
+    """Verdict + clonal loci for one sample, from the shared rule."""
     comp = metrics.get("composition") or {}
     agg  = metrics.get("aggregate") or {}
-    vdj_reads = (comp or {}).get("vdj_assigned_reads", 0) or 0
-    n_clones  = agg.get("n_clonotypes", 0) or 0
-    if vdj_reads == 0 or n_clones == 0:
-        return "no_signal", []
-    clonal_loci = []
-    for L, m in (metrics.get("per_locus") or {}).items():
-        if not m:
-            continue
-        ci    = m.get("clonality_index") or 0
-        top   = m.get("top_clone_fraction") or 0
-        n     = m.get("n_clonotypes") or 0
-        reads = m.get("n_reads") or 0
-        if (ci >= 0.30 and top >= 0.20) or (n == 1 and reads >= 20):
-            clonal_loci.append(L)
-    if clonal_loci:
-        return "clonal", clonal_loci
-    if n_clones < 5:
-        return "indeterminate", []
-    return "no_clonal", []
+    return verdict_category(metrics.get("per_locus") or {},
+                            comp.get("vdj_assigned_reads", 0) or 0,
+                            agg.get("n_clonotypes", 0) or 0)
 
 
 def top_clone_row(clones: pd.DataFrame) -> dict:
@@ -170,20 +155,6 @@ def build_clonality_heatmap(samples: dict[str, dict]) -> go.Figure:
     return fig
 
 
-def find_logo() -> str:
-    """Return inline SVG logo content (mark only, no wordmark), or empty
-    string if not found. Looks at <script_dir>/../assets/."""
-    base = Path(__file__).resolve().parent.parent / "assets"
-    for name in ("lymphix-mark.svg", "logo.svg"):
-        cand = base / name
-        if cand.exists():
-            try:
-                return cand.read_text(encoding="utf-8")
-            except OSError:
-                continue
-    return ""
-
-
 def render(samples: dict[str, dict], out: Path, plotly_mode: str = "inline") -> None:
     n_pass = sum(1 for s in samples.values() if s.get("pass"))
     n_total = len(samples)
@@ -193,8 +164,8 @@ def render(samples: dict[str, dict], out: Path, plotly_mode: str = "inline") -> 
     if plotly_mode == "cdn":
         plotly_block = '<script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>'
     else:
-        plotly_block = f"<script>{get_plotlyjs()}</script>"
-    logo_svg  = find_logo()
+        plotly_block = inline_plotly_js()
+    logo_svg  = load_logo_svg()
     stamp     = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     status_cls = "pass" if n_pass == n_total else "fail"
     badge_label = "PASS" if n_pass == n_total else "FAIL"

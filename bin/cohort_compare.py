@@ -16,24 +16,26 @@ Output: an HTML cohort summary + a TSV with the same data.
 from __future__ import annotations
 import argparse
 import json
-import math
 from pathlib import Path
 from collections import defaultdict
 
 import pandas as pd
 
-DOMINANT_FRACTION_THRESHOLD = 0.05   # ≥5% of IGH locus reads to count as a "dominant" clone
-EDIT_DISTANCE_RELATED       = 3       # ≤3 nt edits = treat as SHM-related
+# Thresholds and the NaN-tolerant helpers are shared; see bin/lymphix_common.py.
+from lymphix_common import (            # noqa: E402
+    DOMINANT_FRACTION_THRESHOLD,
+    EDIT_DISTANCE_RELATED,
+    gene_name as _gene,
+    safe_str,
+)
 
 
 # ---------------------------------------------------------------------------
 # Edit distance (Levenshtein, simple DP)
 # ---------------------------------------------------------------------------
 def edit_distance(a, b) -> int:
-    # Defensive: handle None / NaN
-    if a is None or (isinstance(a, float) and a != a): a = ""
-    if b is None or (isinstance(b, float) and b != b): b = ""
-    a, b = str(a), str(b)
+    # Defensive: a missing junction arrives as NaN from pandas, not None.
+    a, b = safe_str(a), safe_str(b)
     if a == b: return 0
     if not a or not b: return max(len(a), len(b))
     if abs(len(a) - len(b)) > 10: return 999    # short-circuit unrelated lengths
@@ -75,13 +77,6 @@ def dominant_igh_clone(clonotypes_path: Path) -> dict | None:
         fraction     = float(top["locus_fraction"]),
         v_identity   = top.get("igblast_v_identity", None),
     )
-
-
-def _gene(call) -> str:
-    """Defensive gene-name extraction; tolerates NaN / float / None."""
-    if call is None or (isinstance(call, float) and call != call):
-        return ""
-    return str(call).split("*")[0].split(",")[0]
 
 
 def classify_pair(c1: dict | None, c2: dict | None) -> tuple[str, str]:

@@ -30,58 +30,37 @@ from jinja2 import Template
 
 
 # ---------------------------------------------------------------------------
-# Lineage definitions and palettes (mirror build_brochure.py)
+# Lineage definitions, palettes and thresholds
 # ---------------------------------------------------------------------------
-LOCI     = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
-BCR_LOCI = ["IGH", "IGK", "IGL"]
-TCR_LOCI = ["TRA", "TRB", "TRG", "TRD"]
-
-BCR_COLORS = {"IGH": "#1B4F72", "IGK": "#2E86C1", "IGL": "#85C1E9"}
-TCR_COLORS = {"TRB": "#922B21", "TRA": "#C0392B", "TRG": "#E67E22", "TRD": "#F5B041"}
-LOCUS_COLORS = {**BCR_COLORS, **TCR_COLORS}
-LOCUS_ORDER  = BCR_LOCI + TCR_LOCI
-LINEAGE_OF   = {**{l: "BCR" for l in BCR_LOCI}, **{l: "TCR" for l in TCR_LOCI}}
-
-COMP_LABELS = {
-    "clonal_IGH":              "Clonal B-cell (IGH)",
-    "clonal_IGK_kappa":        "Clonal B-cell (κ-restricted, IGK)",
-    "clonal_IGL_lambda":       "Clonal B-cell (λ-restricted, IGL)",
-    "polyclonal_B":            "Polyclonal B-cell",
-    "clonal_TRB":              "Clonal T-cell (αβ, TRB)",
-    "clonal_TRG_gamma_delta":  "Clonal T-cell (γδ, TRG/TRD)",
-    "polyclonal_T":            "Polyclonal T-cell",
-    "background":              "Background / germline",
-}
-COMP_COLORS = {
-    "clonal_IGH":              "#1B4F72",
-    "clonal_IGK_kappa":        "#2E86C1",
-    "clonal_IGL_lambda":       "#85C1E9",
-    "polyclonal_B":            "#D6EAF8",
-    "clonal_TRB":              "#922B21",
-    "clonal_TRG_gamma_delta":  "#E67E22",
-    "polyclonal_T":            "#FAD7A0",
-    "background":              "#7F8C8D",
-}
-COMP_ORDER = list(COMP_LABELS.keys())
-
-# Clonal thresholds used to derive the headline verdict
-LOCUS_CLONAL_INDEX_THRESHOLD = 0.30
-TOP_CLONE_FRACTION_THRESHOLD = 0.20
-LOW_VDJ_YIELD_FRACTION       = 0.005     # fraction of total reads — flag if below
-LOW_VDJ_YIELD_ABSOLUTE       = 200       # absolute V(D)J read count — flag if below
-NO_VDJ_SIGNAL_ABSOLUTE       = 0         # 0 V(D)J reads → no_signal verdict
+# All of these used to be declared here and again, with drift, in
+# cohort_summary.py, cohort_report.py and grade_validation.py. They now have a
+# single home in lymphix_common.py, which sits in bin/ so Nextflow's
+# <projectDir>/bin PATH entry makes it importable inside every task.
+from lymphix_common import (            # noqa: E402
+    BCR_COLORS,
+    BCR_LOCI,
+    COMP_COLORS,
+    COMP_LABELS_LONG as COMP_LABELS,
+    COMP_ORDER,
+    LINEAGE_OF,
+    LOCUS_CLONAL_INDEX_THRESHOLD,
+    LOCUS_COLORS,
+    LOCUS_ORDER,
+    LOW_VDJ_YIELD_ABSOLUTE,
+    LOW_VDJ_YIELD_FRACTION,
+    TCR_COLORS,
+    TCR_LOCI,
+    TOP_CLONE_FRACTION_THRESHOLD,
+    inline_plotly_js,
+    load_logo_svg,
+    safe_str as _str,
+    verdict_category,
+)
 
 
 # ---------------------------------------------------------------------------
 # Verdict logic
 # ---------------------------------------------------------------------------
-def _str(v) -> str:
-    """Safe str() — tolerates NaN / float / None and returns '' for those."""
-    if v is None or (isinstance(v, float) and v != v):  # NaN check
-        return ""
-    return str(v)
-
-
 def _dominant_clone_id(per_locus_clones: list[dict]) -> str:
     """Pick the dominant clone across the listed records and return a compact
     'IGHV2-5*02 / IGHJ6*04 / CDR3 CAHSY...' string. Returns '' if no clone."""
@@ -116,8 +95,14 @@ def compute_verdict(metrics: dict, df=None) -> dict:
 
     details, warnings = [], []
 
+    # The category and the clonal loci both come from the shared rule in
+    # lymphix_common, so the per-sample report, the cohort views and the
+    # validation grader cannot disagree about the same metrics.json. What
+    # follows here is presentation: headlines, supporting detail and warnings.
+    category, clonal_loci = verdict_category(per_locus, vdj_reads, total_n_clonotypes)
+
     # ---- Category: no V(D)J signal ---------------------------------------
-    if vdj_reads <= NO_VDJ_SIGNAL_ABSOLUTE or total_n_clonotypes == 0:
+    if category == "no_signal":
         return dict(
             category="no_signal",
             severity="neutral",
@@ -130,23 +115,7 @@ def compute_verdict(metrics: dict, df=None) -> dict:
             clonal_loci=[],
         )
 
-    # ---- Identify any clonal loci ----------------------------------------
-    # A locus is clonal if either:
-    #   (a) clonality_index >= threshold AND top_clone_fraction >= threshold
-    #   (b) n_clonotypes == 1 AND n_reads >= SINGLE_CLONE_READS_MIN
-    # (b) covers the monoclonal case where clonality_index is undefined.
-    SINGLE_CLONE_READS_MIN = 20
-    clonal_loci = []
-    for L in LOCI:
-        m = per_locus.get(L) or {}
-        ci = m.get("clonality_index") or 0
-        top = m.get("top_clone_fraction") or 0
-        n   = m.get("n_clonotypes") or 0
-        reads = m.get("n_reads") or 0
-        multi_clone_clonal  = ci >= LOCUS_CLONAL_INDEX_THRESHOLD and top >= TOP_CLONE_FRACTION_THRESHOLD
-        single_clone_clonal = (n == 1) and (reads >= SINGLE_CLONE_READS_MIN)
-        if multi_clone_clonal or single_clone_clonal:
-            clonal_loci.append(L)
+    # ---- Split the clonal loci by lineage --------------------------------
     bcr_clonal = [L for L in clonal_loci if L in BCR_LOCI]
     tcr_clonal = [L for L in clonal_loci if L in TCR_LOCI]
 
@@ -250,7 +219,7 @@ def compute_verdict(metrics: dict, df=None) -> dict:
 
     # ---- No clonal expansion --------------------------------------------
     # Distinguish "polyclonal" from "indeterminate / too few clones"
-    if total_n_clonotypes < 5:
+    if category == "indeterminate":
         return dict(
             category="indeterminate", severity="uncertain",
             headline="Indeterminate — insufficient V(D)J yield to assess clonality",
@@ -648,7 +617,13 @@ footer .footer-meta .name { color: #ECF0F1; }
     <h1>{{ sample_id }}</h1>
     <div class="meta">
       Generated {{ generated_on }} &nbsp;|&nbsp;
-      Total input reads: {{ '{:,}'.format(comp.total_input_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
+      {# total_input_reads is null whenever the library size was never supplied.
+         Formatting it unguarded raised a TypeError and killed the whole report,
+         so an unknown total must degrade to a label, never to a fabricated
+         number and never to a crash. #}
+      Total input reads: {{ '{:,}'.format(comp.total_input_reads)
+                            if comp and comp.total_input_reads is not none
+                            else 'not recorded' }} &nbsp;|&nbsp;
       V(D)J assembled: {{ '{:,}'.format(comp.vdj_assigned_reads) if comp else 'n/a' }} &nbsp;|&nbsp;
       Min clone count: {{ min_clone_count }}
     </div>
@@ -796,24 +771,6 @@ footer .footer-meta .name { color: #ECF0F1; }
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-def _load_logo_svg() -> str:
-    """Return inline SVG markup with class='logo' so it can be embedded directly.
-    Prefers the mark-only logo for in-report headers; falls back to the older
-    logo.svg, then to a text-only logo if neither is present."""
-    asset_dirs = [
-        Path(__file__).resolve().parents[1] / "assets",
-        Path(__file__).resolve().parent / "assets",
-    ]
-    names = ("lymphix-mark.svg", "logo.svg")
-    for d in asset_dirs:
-        for name in names:
-            path = d / name
-            if path.exists():
-                svg = path.read_text(encoding="utf-8")
-                return svg.replace("<svg ", '<svg class="logo" ', 1)
-    return '<div class="logo" style="font-weight:700; font-size:22px">Lymphix</div>'
-
-
 def main(argv=None):
     import datetime
     ap = argparse.ArgumentParser()
@@ -869,13 +826,10 @@ def main(argv=None):
 
     # Inline the full Plotly.js bundle once so the report works offline
     # (CDNs like cdn.plot.ly are blocked behind many corporate / NHS firewalls).
-    from plotly.offline import get_plotlyjs
-    plotly_js_inline = f'<script type="text/javascript">{get_plotlyjs()}</script>'
-
     html = Template(TEMPLATE).render(
         sample_id       = args.sample_id,
-        plotly_js       = plotly_js_inline,
-        logo_svg        = _load_logo_svg(),
+        plotly_js       = inline_plotly_js(),
+        logo_svg        = load_logo_svg(),
         generated_on    = datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         min_clone_count = metrics.get("min_clone_count", 2),
         comp            = comp,
