@@ -109,7 +109,7 @@ def build_table(samples: dict[str, dict]) -> go.Figure:
             "Top CDR3":    tc.get("cdr3") or "—",
             "Top reads":   tc.get("reads") or 0,
             "Top %":       round(((m.get("aggregate") or {}).get("top_clone_fraction") or 0) * 100, 1),
-            "IGHV":        ighv.get("dominant_status") or "—",
+            "IGHV":        ighv.get("dominant_clone_status") or "—",
             "Pass":        "PASS" if s.get("pass") else "FAIL",
         })
     df = pd.DataFrame(rows)

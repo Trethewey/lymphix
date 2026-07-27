@@ -138,7 +138,7 @@ def grade_sample(sample_id: str, metrics_path: Path, clonotypes_path: Path,
     exp_ighv = expected.get("expected_ighv_reportable")
     if exp_ighv is True:
         if ighv and ighv.get("reads_total", 0) > 0 and "IGH" in obs_clonal_loci:
-            reasons_pass.append(f"IGHV reportable ({ighv.get('dominant_status')})")
+            reasons_pass.append(f"IGHV reportable ({ighv.get('dominant_clone_status')})")
         else:
             reasons_fail.append("IGHV expected to be reportable but was not")
     elif exp_ighv is False:
@@ -148,11 +148,20 @@ def grade_sample(sample_id: str, metrics_path: Path, clonotypes_path: Path,
     # ---- Optional explicit IGHV mutation status check --------------------
     exp_ighv_status = expected.get("expected_ighv_status")
     if exp_ighv_status:
-        actual = (ighv or {}).get("dominant_status")
+        actual = (ighv or {}).get("dominant_clone_status")
         if actual == exp_ighv_status:
             reasons_pass.append(f"IGHV mutation status {actual} matches expected {exp_ighv_status}")
         else:
             reasons_fail.append(f"IGHV mutation status {actual} but expected {exp_ighv_status}")
+
+    # An empty checklist used to come back pass=True: if no expectation key
+    # matched this sample, nothing was actually verified, and reporting that as
+    # a pass green-lights a null result.
+    if not reasons_pass and not reasons_fail:
+        reasons_fail.append(
+            "No expectation matched this sample — nothing was checked, so this "
+            "cannot count as a pass."
+        )
 
     overall_pass = not reasons_fail
 

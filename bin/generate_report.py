@@ -170,10 +170,20 @@ def compute_verdict(metrics: dict, df=None) -> dict:
             "sequencing recommended before clinical action."
         )
     if comp:
-        vdj_frac = vdj_reads / max(1, comp.get("total_input_reads", 1))
-        if vdj_frac < LOW_VDJ_YIELD_FRACTION:
-            warnings.append(f"V(D)J reads are only {100*vdj_frac:.3f}% of total input — "
-                            "panel may have limited IG/TCR coverage or capture may have under-performed.")
+        # Only computable when the library size is actually known. It used to
+        # fall back to the V(D)J count itself, which made the fraction exactly
+        # 1.0 and the warning unreachable for every run.
+        total_input = comp.get("total_input_reads")
+        if total_input:
+            vdj_frac = vdj_reads / total_input
+            if vdj_frac < LOW_VDJ_YIELD_FRACTION:
+                warnings.append(f"V(D)J reads are only {100*vdj_frac:.3f}% of total input — "
+                                "panel may have limited IG/TCR coverage or capture may have under-performed.")
+        else:
+            warnings.append(
+                "Total input reads not supplied, so panel capture efficiency could "
+                "not be assessed. Pass --total-input-reads to enable this check."
+            )
 
     # ---- Build clone-identity strings for the headline -------------------
     def _clones_for_loci(loci):
@@ -199,9 +209,19 @@ def compute_verdict(metrics: dict, df=None) -> dict:
 
     # ---- IGHV mutation status — ONLY when there is a dominant IGH clone --
     if "IGH" in bcr_clonal and ighv and ighv.get("reads_total", 0) > 0:
-        details.append(f"IGHV mutation status: <b>{ighv['dominant_status']}</b> "
-                       f"({100*ighv['fraction_unmutated']:.0f}% unmutated). "
-                       "Unmutated IGHV (≥98% V-identity) is a poor-prognosis marker in CLL/B-NHL.")
+        dom_status = ighv.get("dominant_clone_status")
+        if dom_status in ("unmutated", "mutated"):
+            ident = ighv.get("dominant_clone_v_identity")
+            ident_str = f"{ident:.1f}% V-identity" if ident is not None else "identity unavailable"
+            details.append(f"IGHV mutation status: <b>{dom_status}</b> "
+                           f"(dominant IGH clone, {ident_str}). "
+                           "Unmutated IGHV (≥98% V-identity) is a poor-prognosis marker in CLL/B-NHL.")
+        else:
+            details.append(
+                "IGHV mutation status: <b>not assessable</b> — the dominant IGH "
+                "clone carries no IgBLAST V-identity, so it was neither graded "
+                "mutated nor unmutated."
+            )
 
     # ---- Verdict category + headline -------------------------------------
     if bcr_clonal and tcr_clonal:
@@ -307,7 +327,7 @@ def interpret(metrics: dict, verdict: dict, df=None) -> str:
         # IGHV addendum if relevant
         ighv_str = ""
         if "IGH" in bcr_clonal and ighv and ighv.get("reads_total", 0) > 0:
-            status = ighv.get("dominant_status", "")
+            status = ighv.get("dominant_clone_status", "")
             if status == "unmutated":
                 ighv_str = (" The dominant IGH clone is IGHV-unmutated "
                             "(≥98% V-identity to germline), which is a "
@@ -740,15 +760,17 @@ footer .footer-meta .name { color: #ECF0F1; }
   <div class="card">
     <table class="clones">
       <tr><th>Reads total</th><th>Unmutated</th><th>Mutated</th><th>Unknown</th>
-          <th>% unmutated</th><th>Dominant call</th></tr>
+          <th>Repertoire % unmutated<br><span class="muted">(assessed reads)</span></th>
+          <th>Dominant clone call</th></tr>
       <tr>
         <td>{{ '{:,}'.format(ighv.reads_total) }}</td>
         <td>{{ '{:,}'.format(ighv.reads_unmutated) }}</td>
         <td>{{ '{:,}'.format(ighv.reads_mutated) }}</td>
         <td>{{ '{:,}'.format(ighv.reads_unknown) }}</td>
-        <td>{{ '%.1f%%'|format(100*(ighv.fraction_unmutated or 0)) }}</td>
-        <td style="font-weight:bold; color:{{ '#c0392b' if ighv.dominant_status=='unmutated' else '#27ae60' }}">
-          {{ ighv.dominant_status }}</td>
+        <td>{% if ighv.repertoire_unmutated_read_fraction is none %}n/a
+            {% else %}{{ '%.1f%%'|format(100*ighv.repertoire_unmutated_read_fraction) }}{% endif %}</td>
+        <td style="font-weight:bold; color:{{ '#c0392b' if ighv.dominant_clone_status=='unmutated' else '#27ae60' if ighv.dominant_clone_status=='mutated' else '#7f8c8d' }}">
+          {{ 'not assessable' if ighv.dominant_clone_status not in ('mutated','unmutated') else ighv.dominant_clone_status }}</td>
       </tr>
     </table>
   </div>

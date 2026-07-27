@@ -110,8 +110,25 @@ def is_germline_rearrangement(row: dict, *,
 # IO
 # ---------------------------------------------------------------------------
 def read_airr(path: Path) -> pd.DataFrame:
-    if not path.exists() or path.stat().st_size == 0:
-        return pd.DataFrame()
+    """Read an AIRR TSV.
+
+    A missing or zero-byte file is an upstream failure, not an empty
+    repertoire. The two are indistinguishable once the frame is empty, and
+    conflating them produced signed "no V(D)J signal detected" reports from
+    runs where the input never arrived. A header-only file is the legitimate
+    way to say "this sample genuinely yielded nothing".
+    """
+    if not path.exists():
+        raise FileNotFoundError(
+            f"AIRR input not found: {path}. If the sample genuinely yielded no "
+            f"rearrangements, pass a header-only file rather than omitting it."
+        )
+    if path.stat().st_size == 0:
+        raise ValueError(
+            f"AIRR input is zero bytes: {path}. A completed run writes at least "
+            f"a header line, so this indicates the upstream step failed. Pass a "
+            f"header-only file if the empty repertoire is genuine."
+        )
     try:
         df = pd.read_csv(path, sep="\t", dtype=str, low_memory=False)
     except pd.errors.EmptyDataError:
@@ -358,6 +375,19 @@ def apply_germline_rearrangement_filter(df: pd.DataFrame, *,
     }
 
 
+def _json_safe(obj):
+    """Recursively replace NaN/Infinity with None so json.dumps stays strict."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, (np.floating, np.integer)):
+        return _json_safe(obj.item())
+    return obj
+
+
 def assign_ighv_mutation_status(df: pd.DataFrame, cutoff: float) -> pd.DataFrame:
     """For IGH clonotypes, classify unmutated (>=cutoff) vs mutated."""
     if "igblast_v_identity" not in df.columns:
@@ -496,7 +526,10 @@ def compute_composition(df: pd.DataFrame,
 
     return {
         "total_input_reads_known":   denom_known,
-        "total_input_reads":         int(total_input_reads) if denom_known else vdj_reads,
+        # None, not vdj_reads: substituting the V(D)J count for the library
+        # size makes the V(D)J fraction identically 1.0, which silently
+        # disables the capture-underperformance warning downstream.
+        "total_input_reads":         int(total_input_reads) if denom_known else None,
         "vdj_assigned_reads":        vdj_reads,
         "denominator_mode":          denominator,
         "denominator_value":         denom,
@@ -627,22 +660,47 @@ def main(argv: list[str] | None = None) -> int:
     aggregate = summarise(df["read_count"].to_numpy())
 
     # ---- IGHV mutation summary -------------------------------------------
+    # IGHV mutation status is a property of the tumour clone, not of the
+    # repertoire: the CLL convention grades the dominant IGH rearrangement
+    # against the germline-identity cutoff. A read-weighted majority over every
+    # IGH clonotype answers a different question, and a polyclonal naive-B tail
+    # (which is unmutated by definition) can outvote a genuinely mutated
+    # tumour clone and invert the prognostic call.
     igh = df[df["locus"] == "IGH"]
     if not igh.empty:
-        total = igh["read_count"].sum()
-        unmut = igh[igh["ighv_status"] == "unmutated"]["read_count"].sum()
-        mut   = igh[igh["ighv_status"] == "mutated"]["read_count"].sum()
-        unk   = igh[igh["ighv_status"] == "unknown"]["read_count"].sum()
+        total = int(igh["read_count"].sum())
+        unmut = int(igh[igh["ighv_status"] == "unmutated"]["read_count"].sum())
+        mut   = int(igh[igh["ighv_status"] == "mutated"]["read_count"].sum())
+        unk   = int(igh[igh["ighv_status"] == "unknown"]["read_count"].sum())
+        assessed = unmut + mut
+
+        dominant = igh.sort_values("read_count", ascending=False).iloc[0]
+        dom_status = dominant["ighv_status"] or "unknown"
+        dom_identity = dominant.get("igblast_v_identity")
+        dom_identity = None if pd.isna(dom_identity) else float(dom_identity)
+        dom_reads = int(dominant["read_count"])
+
         ighv_summary = {
             "cutoff_percent_v_identity": args.igh_mutated_cutoff,
-            "reads_total":      int(total),
-            "reads_unmutated":  int(unmut),
-            "reads_mutated":    int(mut),
-            "reads_unknown":    int(unk),
-            "fraction_unmutated": float(unmut / total) if total else None,
-            "dominant_status":  ("unmutated" if unmut > mut
-                                 else "mutated" if mut > unmut
-                                 else "indeterminate"),
+            "reads_total":      total,
+            "reads_unmutated":  unmut,
+            "reads_mutated":    mut,
+            "reads_unknown":    unk,
+            "reads_assessed":   assessed,
+
+            # The clinical call. "unknown" means the dominant clone carries no
+            # IgBLAST identity and its status was not established — it must not
+            # be reported as either mutated or unmutated.
+            "dominant_clone_status":      dom_status,
+            "dominant_clone_v_identity":  dom_identity,
+            "dominant_clone_reads":       dom_reads,
+            "dominant_clone_fraction":    float(dom_reads / total) if total else None,
+
+            # Descriptive repertoire-wide tally over assessed reads only.
+            # Not the clinical call; unknown reads are excluded from the
+            # denominator so the fraction cannot be diluted by unassessed ones.
+            "repertoire_unmutated_read_fraction":
+                float(unmut / assessed) if assessed else None,
         }
     else:
         ighv_summary = None
@@ -678,7 +736,14 @@ def main(argv: list[str] | None = None) -> int:
         "composition":    composition,
     }
 
-    args.out_metrics.write_text(json.dumps(metrics, indent=2, default=str))
+    # json.dumps emits bare NaN/Infinity tokens by default, which no strict
+    # JSON parser accepts — and a monoclonal sample legitimately has an
+    # undefined clonality_index. Map them to null so metrics.json is always
+    # valid JSON, and so consumers see "not defined" rather than 0.0.
+    metrics = _json_safe(metrics)
+    args.out_metrics.write_text(
+        json.dumps(metrics, indent=2, default=str, allow_nan=False)
+    )
 
     # ---- clonotype tables -------------------------------------------------
     df_sorted = df.sort_values(["locus", "read_count"], ascending=[True, False])

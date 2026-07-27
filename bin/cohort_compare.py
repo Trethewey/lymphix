@@ -141,7 +141,7 @@ def main():
             clonality = agg.get("clonality_index")
             igh_m = (m.get("per_locus") or {}).get("IGH") or {}
             igh_clonality = igh_m.get("clonality_index")
-            ighv_status = (m.get("ighv_status") or {}).get("dominant_status")
+            ighv_status = (m.get("ighv_status") or {}).get("dominant_clone_status")
             samples.append(dict(
                 sample_id=sid, patient=pat,
                 aggregate_clonality=clonality,
