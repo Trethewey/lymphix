@@ -269,3 +269,102 @@ class TestValidationCannotPassVacuously:
             "null result as validated"
         )
         assert graded["reasons_fail"], "the reason must be stated explicitly"
+
+
+# ---------------------------------------------------------------------------
+# A negative call must not be made on read depth that cannot support it
+# ---------------------------------------------------------------------------
+class TestLowYieldNegativesStayIndeterminate:
+    """You may call a positive on low input; you may not call a negative.
+
+    The consolidated verdict rule assesses clonality before yield so that a
+    low-input sample with an unambiguous dominant clone is still reported
+    clonal. Applied to the negative case that same ordering produced
+    "No clonal expansion" — rendered as a green pill with no caveat — for
+    samples the assay had not sampled deeply enough to exclude a clone.
+    """
+
+    @staticmethod
+    def _diverse_no_clonal_locus():
+        # 40 clonotypes, none dominant: diverse-looking, but on what depth?
+        return {"IGH": {"n_clonotypes": 40, "n_reads": 150,
+                        "clonality_index": 0.05, "top_clone_fraction": 0.04}}
+
+    def test_shallow_negative_is_indeterminate(self):
+        import lymphix_common as lc
+        category, loci = lc.verdict_category(
+            self._diverse_no_clonal_locus(), vdj_reads=150, n_clonotypes=40)
+        assert category == "indeterminate", (
+            "150 V(D)J reads cannot exclude a clone; reporting 'no clonal "
+            "expansion' states a confident negative the data cannot support"
+        )
+        assert loci == []
+
+    def test_deep_negative_is_a_real_negative(self):
+        import lymphix_common as lc
+        category, _ = lc.verdict_category(
+            {"IGH": {"n_clonotypes": 40, "n_reads": 50_000,
+                     "clonality_index": 0.05, "top_clone_fraction": 0.04}},
+            vdj_reads=50_000, n_clonotypes=40)
+        assert category == "no_clonal", (
+            "'no_clonal' must remain reachable — it is the only category that "
+            "means 'adequately sampled and genuinely diverse'"
+        )
+
+    def test_shallow_positive_still_stands(self):
+        import lymphix_common as lc
+        category, loci = lc.verdict_category(
+            {"IGH": {"n_clonotypes": 1, "n_reads": 150,
+                     "clonality_index": 1.0, "top_clone_fraction": 1.0}},
+            vdj_reads=150, n_clonotypes=1)
+        assert category == "clonal", (
+            "a real positive on low input must not be buried as indeterminate"
+        )
+        assert loci == ["IGH"]
+
+
+# ---------------------------------------------------------------------------
+# Report must render when the library size is unknown
+# ---------------------------------------------------------------------------
+class TestReportRendersWithoutTotalInputReads:
+    """total_input_reads became null for unknown library sizes; the report
+    header formatted it unguarded and raised TypeError on every sample that
+    did not pass --total-input-reads. The smoke test missed it because both
+    its samples supply the value.
+    """
+
+    @staticmethod
+    def _metrics(total_input):
+        return {
+            "sample_id": "NULLTOTAL",
+            "aggregate": {"n_clonotypes": 3, "n_reads": 300,
+                          "top_clone_fraction": 0.5, "clonality_index": 0.4},
+            "per_locus": {"IGH": {"n_clonotypes": 3, "n_reads": 300,
+                                  "clonality_index": 0.4, "top_clone_fraction": 0.5}},
+            "composition": {"vdj_assigned_reads": 300,
+                            "total_input_reads": total_input,
+                            "total_input_reads_known": total_input is not None,
+                            "fractions": {}, "reads": {}},
+            "ighv_status": None,
+            "cdr3_inference": {"n_clonotypes": 3},
+        }
+
+    def test_verdict_survives_unknown_total(self):
+        import generate_report as gr
+        verdict = gr.compute_verdict(self._metrics(None), None)
+        assert verdict["category"], "an unknown library size must not crash the verdict"
+
+    def test_unknown_total_is_not_fabricated_in_the_warning(self):
+        import generate_report as gr
+        verdict = gr.compute_verdict(self._metrics(None), None)
+        warnings = " ".join(verdict.get("warnings") or [])
+        assert "could not be assessed" in warnings or "not supplied" in warnings, (
+            "an unknown library size must be stated, not silently skipped"
+        )
+
+    def test_known_total_still_computes_the_check(self):
+        import generate_report as gr
+        # 300 V(D)J reads out of 10,000,000 is far below the yield floor
+        verdict = gr.compute_verdict(self._metrics(10_000_000), None)
+        warnings = " ".join(verdict.get("warnings") or [])
+        assert "%" in warnings, "with a known total the capture check must actually fire"

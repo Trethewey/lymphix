@@ -203,8 +203,11 @@ def derive_verdict(r: dict) -> str:
     *before* the clonality and returned 'indeterminate' for any sample under
     LOW_VDJ_YIELD_ABSOLUTE reads, so a low-input sample with an unambiguous
     dominant clone appeared as clonal in its own report and as indeterminate
-    in the cohort. The shared rule assesses clonality first; low yield is a
-    warning carried on the report, not a verdict that erases the finding.
+    in the cohort. The shared rule assesses clonality first, so a positive
+    survives low input — but a *negative* on low input stays indeterminate,
+    because this view attaches no low-yield caveat of its own and
+    "No clonal expansion" would otherwise read as a confident exclusion the
+    read depth cannot support.
 
     The clonal_B / clonal_T split is kept because the cohort figures colour by
     it; it comes from lineage_verdict() applied to the shared clonal loci.

@@ -130,7 +130,9 @@ VERDICT_LABELS = {
     "clonal_B":      "Clonal B",
     "clonal_T":      "Clonal T",
     "no_clonal":     "No clonal expansion",
-    "indeterminate": "Indeterminate (low yield)",
+    # Fires on too few clonotypes to judge diversity OR on yield too low to
+    # exclude a clone, so the label must not name only one of the two.
+    "indeterminate": "Indeterminate",
     "no_signal":     "No V(D)J signal",
 }
 
@@ -262,15 +264,24 @@ def verdict_category(per_locus: dict,
                          repertoire diverse.
         no_clonal      — a diverse repertoire with no dominance.
 
-    ORDER MATTERS, AND THIS ORDER IS A DELIBERATE CHOICE. Clonality is tested
-    before yield. A sample with 150 V(D)J reads all belonging to one clone is
-    'clonal' with a low-yield warning attached, not 'indeterminate'. The
-    alternative — short-circuiting to indeterminate whenever the yield is
-    below LOW_VDJ_YIELD_ABSOLUTE — discards a real positive finding on exactly
-    the low-input samples that are hardest to repeat, and buries it behind a
-    category that reads as "we found nothing". The low yield is still
-    reported: callers attach it as a warning (see LOW_VDJ_YIELD_ABSOLUTE)
-    rather than as a verdict.
+    ORDER MATTERS, AND THE TREATMENT OF LOW YIELD IS DELIBERATELY ASYMMETRIC.
+
+    A positive finding stands on low input: a sample with 150 V(D)J reads all
+    belonging to one clone is 'clonal', not 'indeterminate'. Short-circuiting
+    to indeterminate on yield alone would discard a real positive on exactly
+    the low-input samples that are hardest to repeat, and bury it behind a
+    category that reads as "we found nothing".
+
+    A negative finding does not. Below LOW_VDJ_YIELD_ABSOLUTE the assay has
+    not sampled the repertoire deeply enough to exclude a clone, so the
+    absence of one is 'indeterminate', never 'no_clonal'. Reporting
+    "No clonal expansion" on 150 reads states a confident negative the data
+    cannot support, and the cohort table renders it as a green pill with no
+    caveat attached — a false-negative risk on precisely the samples that
+    most need repeating.
+
+    So 'no_clonal' means "adequately sampled and genuinely diverse", and is
+    the only category that carries that guarantee.
     """
     vdj = int(vdj_reads or 0)
     n   = int(n_clonotypes or 0)
@@ -282,7 +293,7 @@ def verdict_category(per_locus: dict,
     if loci:
         return "clonal", loci
 
-    if n < INDETERMINATE_MAX_CLONOTYPES:
+    if n < INDETERMINATE_MAX_CLONOTYPES or vdj < LOW_VDJ_YIELD_ABSOLUTE:
         return "indeterminate", []
 
     return "no_clonal", []
