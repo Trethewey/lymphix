@@ -1,0 +1,6 @@
+# Everything under containers/ is copied into Linux images, so it must keep
+# LF endings regardless of the checkout platform. With core.autocrlf=true on
+# Windows a shell script would otherwise arrive with a CRLF shebang and fail
+# at build time with the famously unhelpful "no such file or directory".
+*.sh        text eol=lf
+Dockerfile  text eol=lf
