@@ -1,6 +1,28 @@
 {
   "sample_id": "CLONAL_TEST",
+  "wgs_mode": false,
   "min_clone_count": 2,
+  "read_length": 150,
+  "germline_rearrangement_filter": {
+    "n_input": 410,
+    "n_dropped": 0,
+    "n_kept": 410,
+    "by_reason": {},
+    "thresholds": {
+      "min_v_match": 98,
+      "min_v_identity": 85.0,
+      "min_junction_diversity": 3,
+      "min_v_match_adaptive": true
+    }
+  },
+  "cdr3_inference": {
+    "read_length": 150,
+    "anchor_required_nt": 15,
+    "n_clonotypes": 410,
+    "n_single_read_spanned": 410,
+    "n_assembly_inferred": 0,
+    "dominant_clone_spanned": true
+  },
   "per_locus": {
     "IGH": {
       "n_clonotypes": 58,
@@ -97,32 +119,38 @@
     "reads_unmutated": 12729,
     "reads_mutated": 727,
     "reads_unknown": 0,
-    "fraction_unmutated": 0.9459720570749108,
-    "dominant_status": "unmutated"
+    "reads_assessed": 13456,
+    "dominant_clone_status": "unmutated",
+    "dominant_clone_v_identity": 99.2,
+    "dominant_clone_reads": 12500,
+    "dominant_clone_fraction": 0.9289536266349584,
+    "repertoire_unmutated_read_fraction": 0.9459720570749108
   },
   "composition": {
     "total_input_reads_known": true,
     "total_input_reads": 25000,
     "vdj_assigned_reads": 24454,
+    "denominator_mode": "total",
+    "denominator_value": 25000,
     "clonal_dominance_threshold": 0.05,
     "reads": {
       "clonal_IGH": 12500,
-      "clonal_IGK_kappa": 270,
-      "clonal_IGL_lambda": 206,
-      "polyclonal_B": 2257,
+      "clonal_IGK_kappa": 0,
+      "clonal_IGL_lambda": 0,
+      "polyclonal_B": 2733,
       "clonal_TRB": 6200,
-      "clonal_TRG_gamma_delta": 101,
-      "polyclonal_T": 2920,
+      "clonal_TRG_gamma_delta": 0,
+      "polyclonal_T": 3021,
       "background": 546
     },
     "fractions": {
       "clonal_IGH": 0.5,
-      "clonal_IGK_kappa": 0.0108,
-      "clonal_IGL_lambda": 0.00824,
-      "polyclonal_B": 0.09028,
+      "clonal_IGK_kappa": 0.0,
+      "clonal_IGL_lambda": 0.0,
+      "polyclonal_B": 0.10932,
       "clonal_TRB": 0.248,
-      "clonal_TRG_gamma_delta": 0.00404,
-      "polyclonal_T": 0.1168,
+      "clonal_TRG_gamma_delta": 0.0,
+      "polyclonal_T": 0.12084,
       "background": 0.02184
     },
     "kappa_reads": 912,

@@ -1,6 +1,28 @@
 {
   "sample_id": "POLYCLONAL_TEST",
+  "wgs_mode": false,
   "min_clone_count": 2,
+  "read_length": 150,
+  "germline_rearrangement_filter": {
+    "n_input": 600,
+    "n_dropped": 0,
+    "n_kept": 600,
+    "by_reason": {},
+    "thresholds": {
+      "min_v_match": 98,
+      "min_v_identity": 85.0,
+      "min_junction_diversity": 3,
+      "min_v_match_adaptive": true
+    }
+  },
+  "cdr3_inference": {
+    "read_length": 150,
+    "anchor_required_nt": 15,
+    "n_clonotypes": 600,
+    "n_single_read_spanned": 600,
+    "n_assembly_inferred": 0,
+    "dominant_clone_spanned": true
+  },
   "per_locus": {
     "IGH": {
       "n_clonotypes": 95,
@@ -97,13 +119,19 @@
     "reads_unmutated": 785,
     "reads_mutated": 3501,
     "reads_unknown": 0,
-    "fraction_unmutated": 0.18315445636957536,
-    "dominant_status": "mutated"
+    "reads_assessed": 4286,
+    "dominant_clone_status": "mutated",
+    "dominant_clone_v_identity": 94.85,
+    "dominant_clone_reads": 79,
+    "dominant_clone_fraction": 0.018432104526364908,
+    "repertoire_unmutated_read_fraction": 0.18315445636957536
   },
   "composition": {
     "total_input_reads_known": true,
     "total_input_reads": 25000,
     "vdj_assigned_reads": 26456,
+    "denominator_mode": "total",
+    "denominator_value": 25000,
     "clonal_dominance_threshold": 0.05,
     "reads": {
       "clonal_IGH": 0,

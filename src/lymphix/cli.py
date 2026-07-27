@@ -2,11 +2,12 @@
 
 Two ways of running the pipeline are wrapped here:
 
-  * the Nextflow route (`lymphix --samplesheet ...`), which is the documented
-    end-to-end path, and
-  * the analysis scripts under bin/ (`lymphix metrics`, `report`, `cohort`),
-    which is how the real cohorts have actually been processed — TRUST4 run
-    natively, then the Python layer over its AIRR output.
+  * the analysis scripts under bin/ (`lymphix metrics`, `report`, `cohort`) —
+    the supported route, and how every real cohort has actually been
+    processed: TRUST4 run natively, then the Python layer over its AIRR
+    output.
+  * the Nextflow route (`lymphix --samplesheet ...`), which is the intended
+    deployment path but has not yet been validated end-to-end on real data.
 
 Unrecognised arguments are passed straight through to the underlying tool, so
 any Nextflow parameter works without this wrapper knowing about it.

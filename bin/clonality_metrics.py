@@ -288,7 +288,8 @@ def annotate_single_read_spanning(df: pd.DataFrame, read_length: int) -> pd.Data
     observed on at least one read (high-confidence by construction).
     `assembly_inferred = True` is the inverse — the CDR3 was reconstructed by
     TRUST4's overlap-based assembly across multiple reads and should be flagged
-    for further confidence assessment downstream (see bin/infer_long_cdr3.py).
+    for further confidence assessment downstream (see the unfinished scaffold
+    at docs/scaffolds/infer_long_cdr3.py).
     """
     if df.empty:
         return df
