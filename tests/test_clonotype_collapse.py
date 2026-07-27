@@ -233,11 +233,41 @@ class TestAssemblyVariantsCollapse:
         assert stats["n_rows_merged"] == 1
         assert out.iloc[0]["v_call"] == "IGKV3D-15*01", \
             "the dominant member supplies the V call"
-        assert out.iloc[0]["read_count"] == 315, (
-            "reads are NOT summed across assemblies: no TRUST4 output maps "
-            "reads to contigs, so the two may share reads and adding them "
-            "would manufacture depth"
+        assert out.iloc[0]["read_count"] == 485, (
+            "reads ARE summed across assemblies. This was originally max, on "
+            "the assumption that the two contigs might share reads. Measured "
+            "on the real sample these numbers come from "
+            "(CMDL20001026_S127_L004): the contigs share a 334 nt block and "
+            "are one rearrangement, and only 3.8% of reads in "
+            "_assembled_reads.fa appear against more than one contig. Taking "
+            "the max discarded 170 of 485 reads — a 35% understatement of the "
+            "clone, and of the sample's read total — to avoid an overcount "
+            "bounded near 4%."
         )
+
+    def test_collapsing_conserves_the_sample_read_total(self):
+        """Reads must not vanish. The discarded reads did not only shrink the
+        clone: they disappeared from aggregate.n_reads, the per-locus totals
+        and the composition pools, so the sample lost depth it genuinely had.
+        """
+        junction = "TGTCAGCAGTATAATAACTGGCCTTGGACGTTC"
+        df = pd.DataFrame([
+            dict(sequence_id="assemble18_0", locus="IGK", v_call="IGKV3D-15*01",
+                 j_call="IGKJ1*01", junction=junction, junction_aa="CQQYNNWPWTF",
+                 read_count=315, v_identity=100.0),
+            dict(sequence_id="assemble32_0", locus="IGK", v_call="IGKV3-15*01",
+                 j_call="IGKJ1*01", junction=junction, junction_aa="CQQYNNWPWTF",
+                 read_count=170, v_identity=100.0),
+        ])
+        out, stats = cm.collapse_clonotype_rows(df, key=cm.COLLAPSE_KEY_EXACT)
+        assert stats["n_reads_in"] == 485
+        assert stats["n_reads_out"] == 485
+        assert stats["n_reads_delta"] == 0, (
+            "a negative delta means support was discarded; a positive one "
+            "means shared reads were double-counted. Either must be visible "
+            "in metrics.json rather than silent."
+        )
+        assert int(out["read_count"].sum()) == int(df["read_count"].sum())
 
     def test_the_dominant_row_supplies_v_j_and_junction(self):
         df = pd.DataFrame([

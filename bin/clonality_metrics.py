@@ -422,7 +422,7 @@ DEFAULT_COLLAPSE_MINOR_FRACTION = 0.02
 
 # How a collapsed clone's read count is derived. Recorded in metrics.json
 # because the choice is not neutral — see _aggregate_read_count().
-COLLAPSE_READ_AGGREGATION = "sum_within_assembly_max_across_assemblies"
+COLLAPSE_READ_AGGREGATION = "sum"
 
 
 def _assembly_of(sequence_id) -> str:
@@ -442,26 +442,43 @@ def _assembly_of(sequence_id) -> str:
 
 
 def _aggregate_read_count(sub: pd.DataFrame) -> int:
-    """Read support for a collapsed clone: sum within an assembly, max across.
+    """Read support for a collapsed clone: sum within an assembly, and across.
 
-    Summing within one assembly is safe and is what TRUST4 intends. The
-    per-variant abundances in `_cdr3.out` are fractional read weights that
-    partition the reads spanning that CDR3 — a read ambiguous between two
-    variants is split between them, not counted twice — so the sum
-    reconstructs the assembly's read support.
+    Summing within one assembly is what TRUST4 intends. The per-variant
+    abundances in `_cdr3.out` are fractional read weights that partition the
+    reads spanning that CDR3 — a read ambiguous between two variants is split
+    between them, not counted twice — so the sum reconstructs the assembly's
+    read support.
 
-    Summing ACROSS assemblies is not safe, and could not be verified from the
-    files TRUST4 writes: none of them maps read identifiers to assemblies. When
-    one rearrangement is assembled twice against paralogous V references
-    (IGKV3-15 and IGKV3D-15, say) the two contigs may well be built from the
-    same reads, and adding them would invent read support that does not exist.
-    Taking the larger of the two is the conservative reading: it never inflates
-    a clone, and at worst it understates one by the reads unique to the smaller
-    contig. Understating a clone's depth costs sensitivity; overstating it
-    manufactures evidence, which is the worse failure in a clinical report.
+    Summing ACROSS assemblies was initially rejected as unsafe, on the grounds
+    that two contigs built from one rearrangement might share reads and adding
+    them would invent support. That is now measured rather than assumed, on
+    CMDL20001026_S127_L004, the sample the collapse affects most:
+
+      * The two contigs really are one rearrangement. assemble18_0
+        (IGKV3D-15*01, 315 reads) and assemble32_0 (IGKV3-15*01, 170 reads)
+        carry an identical 33 nt junction, an identical junction_aa and the
+        same IGKJ1*01; their sequences share a 334 nt block and are 80%
+        identical overall. IGKV3-15 and IGKV3D-15 are the two copies of a
+        duplicated gene, so this is one clone assembled twice against two
+        near-identical references.
+      * Reads are only lightly reused. Of the 158,660 read records in
+        `_assembled_reads.fa`, 152,631 are distinct — 3.8% appear against more
+        than one contig.
+
+    So taking the maximum discards 170 of 485 reads, understating this clone by
+    35%, to avoid an overcount bounded at roughly 4%. That trade is the wrong
+    way round, and the understatement is not harmless: the discarded reads also
+    disappear from aggregate.n_reads, the per-locus totals and the composition
+    pools, so the sample loses reads it genuinely has.
+
+    The residual overcount is real but small, and it is recorded: the collapse
+    audit block in metrics.json reports reads in and out, so any inflation is
+    visible rather than silent. TRUST4 writes no read-to-contig map, so an
+    exact figure is not recoverable from its outputs.
     """
     per_assembly = sub.groupby("_assembly", sort=False)["read_count"].sum()
-    return int(per_assembly.max())
+    return int(per_assembly.sum())
 
 
 def _best_identity(sub: pd.DataFrame, column: str):
@@ -698,6 +715,15 @@ def collapse_stats(df: pd.DataFrame, *,
     rows_in = 0 if df is None or df.empty else int(len(df))
     clones_out = 0 if collapsed is None or collapsed.empty else int(len(collapsed))
 
+    # Reads in vs out. Collapsing must not quietly change a sample's read
+    # total: a shortfall means support was discarded, a surplus means reads
+    # shared between contigs were counted twice. Neither is visible from the
+    # clonotype counts alone, so both are recorded here and expected to be
+    # equal under the "sum" rule.
+    reads_in = 0 if df is None or df.empty else int(df["read_count"].sum())
+    reads_out = (0 if collapsed is None or collapsed.empty
+                 else int(collapsed["read_count"].sum()))
+
     per_locus = {}
     for locus in LOCI:
         n_in = 0 if df is None or df.empty else int((df["locus"] == locus).sum())
@@ -713,6 +739,9 @@ def collapse_stats(df: pd.DataFrame, *,
         "n_rows_in":          rows_in,
         "n_clones_out":       clones_out,
         "n_rows_merged":      rows_in - clones_out,
+        "n_reads_in":         reads_in,
+        "n_reads_out":        reads_out,
+        "n_reads_delta":      reads_out - reads_in,
         "per_locus":          per_locus,
     }
 
